@@ -126,4 +126,8 @@ cfg := config.Default().
 - **Provider implementations**: `pkg/provider/{name}/client.go`
 - **Examples**: `examples/{complexity}/main.go`
 
-When modifying this codebase, prioritize concurrent safety, respect the rate limiting constraints, and maintain the event-driven architecture. The system is optimized for A-share trading hours and Chinese market characteristics.
+
+## Important Notes
+
+⚠️ **API High Frequency Request Warning**: The Tencent API imposes frequency limitations. When designing code for API requests, please ensure a minimum interval of 200ms between each request. If you plan to test the actual API endpoints, you must notify users in advance, preferably allowing them to execute the tests themselves. Users may need to configure proxies to bypass the server's anti-crawling measures; otherwise, high-frequency API access could lead to IP bans, which would prevent this project from being used or tested properly.
+
