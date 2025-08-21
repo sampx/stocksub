@@ -1,0 +1,7 @@
+.DS_Store
+
+doc/plans/
+doc/learn/
+
+dist/
+tests/data/
