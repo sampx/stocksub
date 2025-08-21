@@ -54,19 +54,25 @@ func (p *Provider) Name() string {
 
 // FetchData 获取股票数据
 func (p *Provider) FetchData(ctx context.Context, symbols []string) ([]subscriber.StockData, error) {
+	result, _, err := p.FetchDataWithRaw(ctx, symbols)
+	return result, err
+}
+
+// FetchDataWithRaw 获取股票数据和原始响应数据
+func (p *Provider) FetchDataWithRaw(ctx context.Context, symbols []string) ([]subscriber.StockData, string, error) {
 	debugMode := os.Getenv("DEBUG") == "1"
 
 	if len(symbols) == 0 {
-		return []subscriber.StockData{}, nil
+		return []subscriber.StockData{}, "", nil
 	}
 
 	if debugMode {
-		p.log.Debugf("Starting FetchData for symbols: %v", symbols)
+		p.log.Debugf("Starting FetchDataWithRaw for symbols: %v", symbols)
 	}
 
 	// 限流控制
 	if err := p.enforceRateLimit(); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	url := p.buildURL(symbols)
@@ -82,7 +88,7 @@ func (p *Provider) FetchData(ctx context.Context, symbols []string) ([]subscribe
 			}
 			select {
 			case <-ctx.Done():
-				return nil, ctx.Err()
+				return nil, "", ctx.Err()
 			case <-time.After(time.Duration(i) * time.Second):
 			}
 		}
@@ -141,21 +147,23 @@ func (p *Provider) FetchData(ctx context.Context, symbols []string) ([]subscribe
 			continue
 		}
 
+		rawData := string(body)
+
 		if debugMode {
 			p.log.Debugf("Parsing response data...")
 		}
 		parseStart := time.Now()
-		result := parseTencentData(string(body))
+		result := parseTencentData(rawData)
 		parseTime := time.Since(parseStart)
 
 		if debugMode {
 			p.log.Infof("Parsing completed in %v, parsed %d records", parseTime, len(result))
 		}
 
-		return result, nil
+		return result, rawData, nil
 	}
 
-	return nil, fmt.Errorf("failed after %d retries: %v", p.maxRetries, lastErr)
+	return nil, "", fmt.Errorf("failed after %d retries: %v", p.maxRetries, lastErr)
 }
 
 // IsSymbolSupported 检查是否支持该股票代码

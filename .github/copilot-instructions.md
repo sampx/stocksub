@@ -7,10 +7,13 @@ StockSub is an enterprise-grade A-share (Chinese stock market) real-time data su
 
 ### Core Layered Architecture
 - **`cmd/stocksub/`** - Main application entry point with graceful shutdown
+- **`cmd/api_monitor/`** - Long-term API monitoring and data collection (2025年8月新增)
 - **`pkg/subscriber/`** - Core subscription engine (subscriber, manager, types)
 - **`pkg/provider/tencent/`** - Tencent data source implementation (client, parser)
 - **`pkg/config/`** - Configuration management with validation
 - **`pkg/logger/`** - Structured logging with logrus
+- **`pkg/testing/`** - CSV data storage and testing infrastructure (2025年8月新增)
+- **`tests/`** - Comprehensive API testing framework (2025年8月重构)
 
 ### Key Patterns
 
@@ -21,6 +24,7 @@ type Provider interface {
     Name() string
     FetchData(ctx context.Context, symbols []string) ([]StockData, error)
     IsSymbolSupported(symbol string) bool
+    GetRateLimit() time.Duration
 }
 ```
 
@@ -28,6 +32,7 @@ type Provider interface {
 - Single 1-second ticker for all subscriptions in `runSubscriptions()`
 - Individual subscription intervals checked on each tick
 - Async `fetchAndNotify()` goroutines prevent blocking
+- Four event types: `EventTypeData`, `EventTypeError`, `EventTypeSubscribed`, `EventTypeUnsubscribed`
 - Event channel (`UpdateEvent`) for monitoring subscription lifecycle
 
 #### 3. Two-Tier Management
@@ -44,6 +49,11 @@ go run ./cmd/stocksub
 # Examples (better for testing)
 go run ./examples/simple      # Basic subscription demo
 go run ./examples/advanced    # Manager with statistics
+
+# API Testing & Monitoring (2025年8月新增)
+go test -v ./tests/csv_integration_test.go    # 30-second API functionality test
+go run ./cmd/api_monitor -duration=5m         # Short-term monitoring
+go run ./cmd/api_monitor -duration=24h        # Long-term data collection
 
 # Production build with cross-compilation
 GOOS=linux GOARCH=amd64 go build -o stocksub-linux ./cmd/stocksub
@@ -80,11 +90,22 @@ s.subsMu.RUnlock()
 - **Request batching**: Multiple symbols in single API call
 - **Retry pattern**: 3 retries with exponential backoff
 
-### 4. Statistics & Monitoring Integration
+### 4. Configuration Chain Pattern
 ```go
-// Manager always maintains subscription statistics
-stats := manager.GetStatistics()
-// Includes: data points, error rates, health status per symbol
+cfg := config.Default().
+    SetDefaultInterval(6*time.Second).
+    SetMaxSubscriptions(50)
+```
+
+### 5. CSV Testing & Monitoring System (2025年8月新增)
+```go
+// API监控器 - 用于长期数据收集
+monitor := NewAPIMonitor(config)
+monitor.StartCollection(ctx, symbols, duration)
+
+// CSV存储 - 用于测试数据持久化
+storage := testing.NewCSVStorage(dataDir)
+storage.SaveDataPoint(dataPoint)
 ```
 
 ## Integration Points
@@ -101,11 +122,11 @@ Four event types in `UpdateEvent`:
 - `EventTypeData`: Successful data updates
 - `EventTypeError`: Error notifications
 
-### 3. Configuration Chain Pattern
+### 3. Statistics & Monitoring Integration
 ```go
-cfg := config.Default().
-    SetDefaultInterval(6*time.Second).
-    SetMaxSubscriptions(50)
+// Manager always maintains subscription statistics
+stats := manager.GetStatistics()
+// Includes: data points, error rates, health status per symbol
 ```
 
 ## Performance Characteristics
@@ -126,8 +147,6 @@ cfg := config.Default().
 - **Provider implementations**: `pkg/provider/{name}/client.go`
 - **Examples**: `examples/{complexity}/main.go`
 
-
 ## Important Notes
 
 ⚠️ **API High Frequency Request Warning**: The Tencent API imposes frequency limitations. When designing code for API requests, please ensure a minimum interval of 200ms between each request. If you plan to test the actual API endpoints, you must notify users in advance, preferably allowing them to execute the tests themselves. Users may need to configure proxies to bypass the server's anti-crawling measures; otherwise, high-frequency API access could lead to IP bans, which would prevent this project from being used or tested properly.
-

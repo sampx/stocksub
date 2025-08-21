@@ -2,6 +2,7 @@ package subscriber
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 )
 
@@ -127,4 +128,14 @@ type Subscriber interface {
 
 	// SetProvider 设置数据提供商
 	SetProvider(provider Provider)
+}
+
+// MarshalStockData a helper to marshal stock data to json
+func MarshalStockData(sd StockData) ([]byte, error) {
+	return json.Marshal(sd)
+}
+
+// UnmarshalStockData a helper to unmarshal stock data from json
+func UnmarshalStockData(data []byte, sd *StockData) error {
+	return json.Unmarshal(data, sd)
 }
