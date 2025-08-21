@@ -116,19 +116,19 @@ func parseTencentData(data string) []subscriber.StockData {
 		// 单位转换（A股数据从手转换为股）
 		// fields[0]: 1-科创板+上海主板, 51-创业板+深圳主板, 62-北交所
 		// 所有A股市场：成交量和买卖盘口数据都需要从手转换为股
-		stockData.Volume *= 100
-		stockData.BidVolume1 *= 100
-		stockData.BidVolume2 *= 100
-		stockData.BidVolume3 *= 100
-		stockData.BidVolume4 *= 100
-		stockData.BidVolume5 *= 100
-		stockData.AskVolume1 *= 100
-		stockData.AskVolume2 *= 100
-		stockData.AskVolume3 *= 100
-		stockData.AskVolume4 *= 100
-		stockData.AskVolume5 *= 100
-		stockData.InnerDisc *= 100
-		stockData.OuterDisc *= 100
+		// stockData.Volume *= 100
+		// stockData.BidVolume1 *= 100
+		// stockData.BidVolume2 *= 100
+		// stockData.BidVolume3 *= 100
+		// stockData.BidVolume4 *= 100
+		// stockData.BidVolume5 *= 100
+		// stockData.AskVolume1 *= 100
+		// stockData.AskVolume2 *= 100
+		// stockData.AskVolume3 *= 100
+		// stockData.AskVolume4 *= 100
+		// stockData.AskVolume5 *= 100
+		// stockData.InnerDisc *= 100
+		// stockData.OuterDisc *= 100
 
 		results = append(results, stockData)
 	}

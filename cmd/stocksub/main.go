@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,7 +11,12 @@ import (
 	"stocksub/pkg/logger"
 	"stocksub/pkg/provider/tencent"
 	"stocksub/pkg/subscriber"
+
+	"github.com/sirupsen/logrus"
 )
+
+// 全局日志记录器
+var log *logrus.Entry
 
 func main() {
 	// 初始化配置
@@ -20,19 +24,15 @@ func main() {
 
 	// 初始化日志系统
 	loggerConfig := logger.Config{
-		Level:      cfg.Logger.Level,
-		Output:     cfg.Logger.Output,
-		Filename:   cfg.Logger.Filename,
-		MaxSize:    cfg.Logger.MaxSize,
-		MaxBackups: cfg.Logger.MaxBackups,
-		MaxAge:     cfg.Logger.MaxAge,
+		Level:  cfg.Logger.Level,
+		Format: "text", // 使用文本格式
 	}
-	if err := logger.Init(loggerConfig); err != nil {
-		fmt.Printf("Failed to initialize logger: %v\n", err)
-		os.Exit(1)
-	}
+	logger.Init(loggerConfig)
 
-	logger.Info("StockSub starting...")
+	// 初始化全局日志记录器
+	log = logger.WithComponent("StockSub")
+
+	log.Infof("StockSub starting...")
 
 	// 创建数据提供商
 	provider := tencent.NewProvider()
@@ -48,7 +48,7 @@ func main() {
 	defer cancel()
 
 	if err := manager.Start(ctx); err != nil {
-		logger.Error("Failed to start manager: %v", err)
+		log.Errorf("Failed to start manager: %v", err)
 		os.Exit(1)
 	}
 
@@ -57,7 +57,7 @@ func main() {
 
 	for _, symbol := range symbols {
 		err := manager.Subscribe(symbol, 6*time.Second, func(data subscriber.StockData) error {
-			logger.Info("收到 %s (%s) 数据: 价格=%.2f, 涨跌=%+.2f (%.2f%%), 成交量=%d, 买一=%.2f(%d), 卖一=%.2f(%d), 时间=%s",
+			log.Infof("收到 %s (%s) 数据: 价格=%.2f, 涨跌=%+.2f (%.2f%%), 成交量=%d, 买一=%.2f(%d), 卖一=%.2f(%d), 时间=%s",
 				data.Symbol, data.Name, data.Price, data.Change, data.ChangePercent,
 				data.Volume, data.BidPrice1, data.BidVolume1, data.AskPrice1, data.AskVolume1,
 				data.Timestamp.Format("15:04:05"))
@@ -65,11 +65,11 @@ func main() {
 		})
 
 		if err != nil {
-			logger.Error("Failed to subscribe to %s: %v", symbol, err)
+			log.Errorf("Failed to subscribe to %s: %v", symbol, err)
 		}
 	}
 
-	logger.Info("已订阅 %d 只股票，每6秒更新一次", len(symbols))
+	log.Infof("已订阅 %d 只股票，每6秒更新一次", len(symbols))
 
 	// 启动统计输出
 	go printStatistics(manager)
@@ -79,9 +79,9 @@ func main() {
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 	<-c
 
-	logger.Info("收到退出信号，正在关闭...")
+	log.Infof("收到退出信号，正在关闭...")
 	manager.Stop()
-	logger.Info("已退出")
+	log.Infof("已退出")
 }
 
 // printStatistics 定期打印统计信息
@@ -92,10 +92,10 @@ func printStatistics(manager *subscriber.Manager) {
 	for range ticker.C {
 		stats := manager.GetStatistics()
 
-		logger.Info("=== 统计信息 ===")
-		logger.Info("订阅总数: %d, 活跃订阅: %d", stats.TotalSubscriptions, stats.ActiveSubscriptions)
-		logger.Info("数据点总数: %d, 错误总数: %d", stats.TotalDataPoints, stats.TotalErrors)
-		logger.Info("运行时间: %v", time.Since(stats.StartTime).Round(time.Second))
+		log.Infof("=== 统计信息 ===")
+		log.Infof("订阅总数: %d, 活跃订阅: %d", stats.TotalSubscriptions, stats.ActiveSubscriptions)
+		log.Infof("数据点总数: %d, 错误总数: %d", stats.TotalDataPoints, stats.TotalErrors)
+		log.Infof("运行时间: %v", time.Since(stats.StartTime).Round(time.Second))
 
 		// 打印各股票统计
 		for symbol, subStats := range stats.SubscriptionStats {
@@ -104,10 +104,10 @@ func printStatistics(manager *subscriber.Manager) {
 				healthStatus = "异常"
 			}
 
-			logger.Info("  %s: 数据点=%d, 错误=%d, 状态=%s, 最后更新=%s",
+			log.Infof("  %s: 数据点=%d, 错误=%d, 状态=%s, 最后更新=%s",
 				symbol, subStats.DataPointCount, subStats.ErrorCount, healthStatus,
 				subStats.LastDataTime.Format("15:04:05"))
 		}
-		logger.Info("===============")
+		log.Infof("===============")
 	}
 }

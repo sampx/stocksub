@@ -4,14 +4,16 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"stocksub/pkg/logger"
 	"stocksub/pkg/subscriber"
+
+	"github.com/sirupsen/logrus"
 )
 
 // Provider 腾讯数据提供商
@@ -22,6 +24,7 @@ type Provider struct {
 	rateLimit   time.Duration
 	maxRetries  int
 	userAgent   string
+	log         *logrus.Entry
 }
 
 // NewProvider 创建腾讯数据提供商
@@ -40,6 +43,7 @@ func NewProvider() *Provider {
 		rateLimit:  200 * time.Millisecond,
 		maxRetries: 3,
 		userAgent:  "StockSub/1.0",
+		log:        logger.WithComponent("TencentProvider"),
 	}
 }
 
@@ -57,7 +61,7 @@ func (p *Provider) FetchData(ctx context.Context, symbols []string) ([]subscribe
 	}
 
 	if debugMode {
-		log.Printf("[TencentProvider] Starting FetchData for symbols: %v", symbols)
+		p.log.Debugf("Starting FetchData for symbols: %v", symbols)
 	}
 
 	// 限流控制
@@ -67,14 +71,14 @@ func (p *Provider) FetchData(ctx context.Context, symbols []string) ([]subscribe
 
 	url := p.buildURL(symbols)
 	if debugMode {
-		log.Printf("[TencentProvider] Request URL: %s", url)
+		p.log.Debugf("Request URL: %s", url)
 	}
 
 	var lastErr error
 	for i := 0; i < p.maxRetries; i++ {
 		if i > 0 {
 			if debugMode {
-				log.Printf("[TencentProvider] Retry attempt %d/%d", i+1, p.maxRetries)
+				p.log.Debugf("Retry attempt %d/%d", i+1, p.maxRetries)
 			}
 			select {
 			case <-ctx.Done():
@@ -88,7 +92,7 @@ func (p *Provider) FetchData(ctx context.Context, symbols []string) ([]subscribe
 		if err != nil {
 			lastErr = fmt.Errorf("create request failed: %w", err)
 			if debugMode {
-				log.Printf("[TencentProvider] Request creation failed: %v", lastErr)
+				p.log.Errorf("Request creation failed: %v", lastErr)
 			}
 			continue
 		}
@@ -99,7 +103,7 @@ func (p *Provider) FetchData(ctx context.Context, symbols []string) ([]subscribe
 		if err != nil {
 			lastErr = fmt.Errorf("HTTP request failed: %w", err)
 			if debugMode {
-				log.Printf("[TencentProvider] HTTP request failed after %v: %v", time.Since(requestStart), lastErr)
+				p.log.Errorf("HTTP request failed after %v: %v", time.Since(requestStart), lastErr)
 			}
 			continue
 		}
@@ -110,21 +114,21 @@ func (p *Provider) FetchData(ctx context.Context, symbols []string) ([]subscribe
 		if err != nil {
 			lastErr = fmt.Errorf("read response failed: %w", err)
 			if debugMode {
-				log.Printf("[TencentProvider] Response read failed: %v", lastErr)
+				p.log.Errorf("Response read failed: %v", lastErr)
 			}
 			continue
 		}
 
 		requestDuration := time.Since(requestStart)
 		if debugMode {
-			log.Printf("[TencentProvider] HTTP request completed in %v, status: %d, body length: %d",
+			p.log.Debugf("HTTP request completed in %v, status: %d, body length: %d",
 				requestDuration, resp.StatusCode, len(body))
 		}
 
 		if resp.StatusCode != http.StatusOK {
 			lastErr = fmt.Errorf("HTTP status error: %d", resp.StatusCode)
 			if debugMode {
-				log.Printf("[TencentProvider] HTTP status error: %d", resp.StatusCode)
+				p.log.Errorf("HTTP status error: %d", resp.StatusCode)
 			}
 			continue
 		}
@@ -132,20 +136,20 @@ func (p *Provider) FetchData(ctx context.Context, symbols []string) ([]subscribe
 		if len(body) == 0 {
 			lastErr = fmt.Errorf("empty response")
 			if debugMode {
-				log.Printf("[TencentProvider] Empty response received")
+				p.log.Warnf("Empty response received")
 			}
 			continue
 		}
 
 		if debugMode {
-			log.Printf("[TencentProvider] Parsing response data...")
+			p.log.Debugf("Parsing response data...")
 		}
 		parseStart := time.Now()
 		result := parseTencentData(string(body))
 		parseTime := time.Since(parseStart)
 
 		if debugMode {
-			log.Printf("[TencentProvider] Parsing completed in %v, parsed %d records", parseTime, len(result))
+			p.log.Infof("Parsing completed in %v, parsed %d records", parseTime, len(result))
 		}
 
 		return result, nil

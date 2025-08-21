@@ -1,217 +1,130 @@
 package logger
 
 import (
-	"fmt"
-	"io"
-	"log"
 	"os"
-	"path/filepath"
 	"strings"
-	"sync"
-	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
-// Level 日志级别
-type Level int
-
-const (
-	LevelDebug Level = iota
-	LevelInfo
-	LevelWarn
-	LevelError
+var (
+	// Logger 全局日志实例
+	Logger *logrus.Logger
 )
-
-var levelNames = map[Level]string{
-	LevelDebug: "DEBUG",
-	LevelInfo:  "INFO",
-	LevelWarn:  "WARN",
-	LevelError: "ERROR",
-}
-
-// Logger 日志记录器
-type Logger struct {
-	level      Level
-	output     io.Writer
-	mu         sync.Mutex
-	prefix     string
-	timeFormat string
-}
 
 // Config 日志配置
 type Config struct {
-	Level      string `json:"level"`       // debug, info, warn, error
-	Output     string `json:"output"`      // console, file, both
-	Filename   string `json:"filename"`    // 日志文件名
-	MaxSize    int    `json:"max_size"`    // 最大文件大小(MB)
-	MaxBackups int    `json:"max_backups"` // 最大备份数
-	MaxAge     int    `json:"max_age"`     // 最大保存天数
+	Level  string `json:"level"`  // debug, info, warn, error
+	Format string `json:"format"` // text, json
 }
 
-var (
-	defaultLogger *Logger
-	once          sync.Once
-)
+// Init 初始化日志器
+func Init(config Config) {
+	Logger = logrus.New()
 
-// Init 初始化全局日志器
-func Init(config Config) error {
-	var err error
-	once.Do(func() {
-		defaultLogger, err = NewLogger(config)
+	// 设置日志级别
+	level, err := logrus.ParseLevel(config.Level)
+	if err != nil {
+		level = logrus.InfoLevel
+	}
+	Logger.SetLevel(level)
+
+	// 设置格式
+	if config.Format == "json" {
+		Logger.SetFormatter(&logrus.JSONFormatter{
+			TimestampFormat: "2006-01-02 15:04:05.000",
+		})
+	} else {
+		Logger.SetFormatter(&logrus.TextFormatter{
+			TimestampFormat: "2006-01-02 15:04:05.000",
+			FullTimestamp:   true,
+			ForceColors:     true,
+		})
+	}
+
+	Logger.SetOutput(os.Stdout)
+}
+
+// InitFromEnv 从环境变量初始化日志器
+func InitFromEnv() {
+	level := os.Getenv("LOG_LEVEL")
+	if level == "" {
+		if os.Getenv("DEBUG") == "1" {
+			level = "debug"
+		} else {
+			level = "info"
+		}
+	}
+
+	format := os.Getenv("LOG_FORMAT")
+	if format == "" {
+		format = "text"
+	}
+
+	Init(Config{
+		Level:  level,
+		Format: format,
 	})
-	return err
 }
 
-// NewLogger 创建新的日志器
-func NewLogger(config Config) (*Logger, error) {
-	level := parseLevel(config.Level)
-
-	var output io.Writer
-	switch strings.ToLower(config.Output) {
-	case "console":
-		output = os.Stdout
-	case "file":
-		if config.Filename == "" {
-			config.Filename = "stocksub.log"
-		}
-		file, err := openLogFile(config.Filename)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open log file: %w", err)
-		}
-		output = file
-	case "both":
-		if config.Filename == "" {
-			config.Filename = "stocksub.log"
-		}
-		file, err := openLogFile(config.Filename)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open log file: %w", err)
-		}
-		output = io.MultiWriter(os.Stdout, file)
-	default:
-		output = os.Stdout
+// GetLogger 获取日志器实例
+func GetLogger() *logrus.Logger {
+	if Logger == nil {
+		InitFromEnv()
 	}
-
-	return &Logger{
-		level:      level,
-		output:     output,
-		prefix:     "[StockSub]",
-		timeFormat: "2006-01-02 15:04:05",
-	}, nil
+	return Logger
 }
 
-// parseLevel 解析日志级别
-func parseLevel(levelStr string) Level {
-	switch strings.ToLower(levelStr) {
-	case "debug":
-		return LevelDebug
-	case "info":
-		return LevelInfo
-	case "warn", "warning":
-		return LevelWarn
-	case "error":
-		return LevelError
-	default:
-		return LevelInfo
-	}
-}
-
-// openLogFile 打开日志文件
-func openLogFile(filename string) (*os.File, error) {
-	dir := filepath.Dir(filename)
-	if dir != "." && dir != "" {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return nil, err
-		}
-	}
-
-	return os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-}
-
-// log 通用日志记录方法
-func (l *Logger) log(level Level, format string, args ...interface{}) {
-	if level < l.level {
-		return
-	}
-
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	timestamp := time.Now().Format(l.timeFormat)
-	levelName := levelNames[level]
-	message := fmt.Sprintf(format, args...)
-
-	logLine := fmt.Sprintf("%s %s [%s] %s\n", timestamp, l.prefix, levelName, message)
-	l.output.Write([]byte(logLine))
+// WithComponent 创建带组件名的日志器
+func WithComponent(component string) *logrus.Entry {
+	return GetLogger().WithField("component", component)
 }
 
 // Debug 调试日志
-func (l *Logger) Debug(format string, args ...interface{}) {
-	l.log(LevelDebug, format, args...)
+func Debug(args ...interface{}) {
+	GetLogger().Debug(args...)
+}
+
+// Debugf 格式化调试日志
+func Debugf(format string, args ...interface{}) {
+	GetLogger().Debugf(format, args...)
 }
 
 // Info 信息日志
-func (l *Logger) Info(format string, args ...interface{}) {
-	l.log(LevelInfo, format, args...)
+func Info(args ...interface{}) {
+	GetLogger().Info(args...)
+}
+
+// Infof 格式化信息日志
+func Infof(format string, args ...interface{}) {
+	GetLogger().Infof(format, args...)
 }
 
 // Warn 警告日志
-func (l *Logger) Warn(format string, args ...interface{}) {
-	l.log(LevelWarn, format, args...)
+func Warn(args ...interface{}) {
+	GetLogger().Warn(args...)
+}
+
+// Warnf 格式化警告日志
+func Warnf(format string, args ...interface{}) {
+	GetLogger().Warnf(format, args...)
 }
 
 // Error 错误日志
-func (l *Logger) Error(format string, args ...interface{}) {
-	l.log(LevelError, format, args...)
+func Error(args ...interface{}) {
+	GetLogger().Error(args...)
+}
+
+// Errorf 格式化错误日志
+func Errorf(format string, args ...interface{}) {
+	GetLogger().Errorf(format, args...)
 }
 
 // SetLevel 设置日志级别
-func (l *Logger) SetLevel(level Level) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.level = level
-}
-
-// SetPrefix 设置日志前缀
-func (l *Logger) SetPrefix(prefix string) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.prefix = prefix
-}
-
-// 全局日志方法
-func Debug(format string, args ...interface{}) {
-	if defaultLogger != nil {
-		defaultLogger.Debug(format, args...)
-	} else {
-		log.Printf("[DEBUG] "+format, args...)
+func SetLevel(level string) {
+	l, err := logrus.ParseLevel(strings.ToLower(level))
+	if err != nil {
+		l = logrus.InfoLevel
 	}
-}
-
-func Info(format string, args ...interface{}) {
-	if defaultLogger != nil {
-		defaultLogger.Info(format, args...)
-	} else {
-		log.Printf("[INFO] "+format, args...)
-	}
-}
-
-func Warn(format string, args ...interface{}) {
-	if defaultLogger != nil {
-		defaultLogger.Warn(format, args...)
-	} else {
-		log.Printf("[WARN] "+format, args...)
-	}
-}
-
-func Error(format string, args ...interface{}) {
-	if defaultLogger != nil {
-		defaultLogger.Error(format, args...)
-	} else {
-		log.Printf("[ERROR] "+format, args...)
-	}
-}
-
-// GetDefaultLogger 获取默认日志器
-func GetDefaultLogger() *Logger {
-	return defaultLogger
+	GetLogger().SetLevel(l)
 }
