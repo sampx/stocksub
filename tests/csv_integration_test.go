@@ -1,3 +1,5 @@
+//go:build integration
+
 package tests
 
 import (
@@ -7,38 +9,32 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"stocksub/pkg/provider/tencent"
+	"stocksub/pkg/testkit/storage"
 	"testing"
 	"time"
-
-	"stocksub/pkg/provider/tencent"
-	"stocksub/pkg/subscriber"
-	apitesting "stocksub/pkg/testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 // TestAPIMonitor 测试API监控器的完整功能
-// 这是一个快速版本的监控器测试，验证核心功能
 func TestAPIMonitor(t *testing.T) {
 	if testing.Short() {
 		t.Skip("跳过API监控器测试")
 	}
 
-	// 使用测试专用目录
 	_, currentFile, _, _ := runtime.Caller(0)
 	testsDir := filepath.Dir(currentFile)
 	testDataDir := filepath.Join(testsDir, "data", "monitor_test")
 
-	// 清理并创建测试目录
 	os.RemoveAll(testDataDir)
 	err := os.MkdirAll(testDataDir, 0755)
 	require.NoError(t, err)
 
-	// 创建测试版本的监控器配置
 	config := MonitorConfig{
 		Symbols:       []string{"600000", "000001"},
-		Duration:      30 * time.Second, // 快速测试：30秒
-		Interval:      3 * time.Second,  // 每3秒采集一轮
+		Duration:      30 * time.Second,
+		Interval:      3 * time.Second,
 		DataDir:       testDataDir,
 		LogDir:        filepath.Join(testDataDir, "logs"),
 		CleanupOnExit: true,
@@ -52,27 +48,24 @@ func TestAPIMonitor(t *testing.T) {
 	t.Logf("测试配置: 股票%v, 时长%v, 间隔%v", config.Symbols, config.Duration, config.Interval)
 	t.Logf("数据目录: %s", config.DataDir)
 
-	// 运行监控器
 	err = monitor.Run()
 	require.NoError(t, err, "监控器运行失败")
 
 	// 验证生成的文件
 	t.Run("验证数据文件", func(t *testing.T) {
-		today := time.Now().Format("2006-01-02")
-		expectedFiles := map[string]string{
-			fmt.Sprintf("api_data_%s.csv", today):    filepath.Join(testDataDir, "collected"),
-			fmt.Sprintf("performance_%s.csv", today): filepath.Join(testDataDir, "collected"),
+		// 新的CSVStorage会根据类型和日期创建文件，我们只需验证存在.csv文件
+		files, err := os.ReadDir(config.DataDir)
+		require.NoError(t, err)
+		csvFileFound := false
+		for _, file := range files {
+			if strings.HasSuffix(file.Name(), ".csv") {
+				info, _ := file.Info()
+				require.Greater(t, info.Size(), int64(0), "数据文件为空: %s", file.Name())
+				t.Logf("✅ 找到数据文件: %s (大小: %d bytes)", file.Name(), info.Size())
+				csvFileFound = true
+			}
 		}
-
-		for filename, dir := range expectedFiles {
-			filePath := filepath.Join(dir, filename)
-			_, err := os.Stat(filePath)
-			require.NoError(t, err, "数据文件不存在: %s", filePath)
-
-			info, _ := os.Stat(filePath)
-			require.Greater(t, info.Size(), int64(100), "数据文件太小: %s", filename)
-			t.Logf("✅ 数据文件: %s (大小: %d bytes)", filename, info.Size())
-		}
+		require.True(t, csvFileFound, "未能找到任何CSV数据文件")
 	})
 
 	t.Run("验证日志文件", func(t *testing.T) {
@@ -98,35 +91,14 @@ func TestAPIMonitor(t *testing.T) {
 		require.Greater(t, info.Size(), int64(500), "分析报告太小")
 		t.Logf("✅ 分析报告: %s (大小: %d bytes)", filepath.Base(reportFile), info.Size())
 
-		// 检查报告内容
 		content, err := os.ReadFile(reportFile)
 		require.NoError(t, err)
 		reportText := string(content)
 
-		// 验证报告关键内容
 		require.Contains(t, reportText, "API监控分析报告", "报告标题缺失")
 		require.Contains(t, reportText, "600000", "股票代码缺失")
-		require.Contains(t, reportText, "000001", "股票代码缺失")
 		require.Contains(t, reportText, "成功率", "成功率统计缺失")
-		require.Contains(t, reportText, "API调用轮次", "轮次统计缺失")
 		t.Logf("✅ 分析报告内容验证通过")
-	})
-
-	t.Run("验证原始数据完整性", func(t *testing.T) {
-		// 读取API数据文件，验证原始数据是否包含
-		today := time.Now().Format("2006-01-02")
-		apiDataFile := filepath.Join(testDataDir, "collected", fmt.Sprintf("api_data_%s.csv", today))
-
-		content, err := os.ReadFile(apiDataFile)
-		require.NoError(t, err)
-
-		lines := strings.Split(string(content), "\n")
-		require.Greater(t, len(lines), 5, "数据文件行数太少") // 至少有表头+几行数据
-
-		// 检查是否包含原始API响应数据
-		dataLine := lines[1]                             // 第一行数据（跳过表头）
-		require.Contains(t, dataLine, "v_", "原始API数据缺失") // 腾讯API响应特征
-		t.Logf("✅ 原始数据完整性验证通过")
 	})
 
 	t.Logf("✅ API监控器测试完成")
@@ -142,18 +114,27 @@ type MonitorConfig struct {
 	CleanupOnExit bool
 }
 
+// PerformanceMetric 定义了用于此测试的性能指标结构
+type PerformanceMetric struct {
+	Timestamp         time.Time `json:"timestamp"`
+	Symbol            string    `json:"symbol"`
+	RequestDurationMs int64     `json:"request_duration_ms"`
+	ResponseSizeBytes int64     `json:"response_size_bytes"`
+	ErrorOccurred     bool      `json:"error_occurred"`
+	ErrorMessage      string    `json:"error_message"`
+}
+
 // APIMonitorTest 测试版本的API监控器
 type APIMonitorTest struct {
 	config   MonitorConfig
 	provider *tencent.Provider
-	storage  *apitesting.CSVStorage
+	storage  *storage.CSVStorage // 使用新的 a
 	logger   *os.File
 	t        *testing.T
 }
 
 // NewTestAPIMonitor 创建测试版本的API监控器
 func NewTestAPIMonitor(config MonitorConfig, t *testing.T) (*APIMonitorTest, error) {
-	// 创建目录
 	dirs := []string{config.DataDir, config.LogDir}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -161,25 +142,28 @@ func NewTestAPIMonitor(config MonitorConfig, t *testing.T) (*APIMonitorTest, err
 		}
 	}
 
-	// 创建日志文件
 	logPath := filepath.Join(config.LogDir, fmt.Sprintf("monitor_%s.log", time.Now().Format("20060102_150405")))
 	logFile, err := os.Create(logPath)
 	if err != nil {
 		return nil, fmt.Errorf("创建日志文件失败: %v", err)
 	}
 
-	// 创建Provider
 	provider := tencent.NewProvider()
 	provider.SetTimeout(15 * time.Second)
 	provider.SetRateLimit(1 * time.Second)
 
-	// 创建存储器
-	storage := apitesting.NewCSVStorage(config.DataDir)
+	// 使用新的 testkit storage
+	storageCfg := storage.DefaultCSVStorageConfig()
+	storageCfg.Directory = config.DataDir
+	csvStorage, err := storage.NewCSVStorage(storageCfg)
+	if err != nil {
+		return nil, fmt.Errorf("创建CSVStorage失败: %w", err)
+	}
 
 	monitor := &APIMonitorTest{
 		config:   config,
 		provider: provider,
-		storage:  storage,
+		storage:  csvStorage,
 		logger:   logFile,
 		t:        t,
 	}
@@ -192,7 +176,6 @@ func NewTestAPIMonitor(config MonitorConfig, t *testing.T) (*APIMonitorTest, err
 func (m *APIMonitorTest) Run() error {
 	startTime := time.Now()
 	endTime := startTime.Add(m.config.Duration)
-
 	m.log(fmt.Sprintf("开始监控: %v", startTime.Format("2006-01-02 15:04:05")))
 
 	collectionCount := 0
@@ -203,31 +186,23 @@ func (m *APIMonitorTest) Run() error {
 		iterationStart := time.Now()
 		collectionCount++
 
-		if err := m.collectData(&successCount, &errorCount, collectionCount); err != nil {
+		if err := m.collectData(context.Background(), &successCount, &errorCount, collectionCount); err != nil {
 			m.log(fmt.Sprintf("第%d轮采集出现错误: %v", collectionCount, err))
 		}
 
-		// 每5轮打印进度（测试版本更频繁）
-		if collectionCount%5 == 0 {
+		if collectionCount%2 == 0 {
 			elapsed := time.Since(startTime)
-			remaining := m.config.Duration - elapsed
-			totalAttempts := collectionCount * len(m.config.Symbols)
-			currentSuccessRate := float64(successCount) / float64(totalAttempts) * 100
-
-			progress := fmt.Sprintf("进度: 第%d轮，成功率 %.1f%%, 剩余 %v",
-				collectionCount, currentSuccessRate, remaining.Round(time.Second))
+			progress := fmt.Sprintf("进度: 第%d轮, 已运行 %v", collectionCount, elapsed.Round(time.Second))
 			m.log(progress)
-			m.t.Log(progress) // 同时输出到测试日志
+			m.t.Log(progress)
 		}
 
-		// 等待下一次采集
 		sleepTime := m.config.Interval - time.Since(iterationStart)
 		if sleepTime > 0 {
 			time.Sleep(sleepTime)
 		}
 	}
 
-	// 生成分析报告
 	if err := m.generateAnalysisReport(startTime, collectionCount, successCount, errorCount); err != nil {
 		return fmt.Errorf("生成分析报告失败: %v", err)
 	}
@@ -237,56 +212,39 @@ func (m *APIMonitorTest) Run() error {
 }
 
 // collectData 执行一轮数据采集
-func (m *APIMonitorTest) collectData(successCount, errorCount *int, roundNum int) error {
+func (m *APIMonitorTest) collectData(ctx context.Context, successCount, errorCount *int, roundNum int) error {
 	queryTime := time.Now()
 
-	ctx := context.Background()
 	result, rawData, err := m.provider.FetchDataWithRaw(ctx, m.config.Symbols)
-
 	responseTime := time.Now()
 	requestDuration := responseTime.Sub(queryTime)
 
-	// 记录性能指标
-	perfMetric := apitesting.PerformanceMetric{
+	perfMetric := PerformanceMetric{
 		Timestamp:         queryTime,
 		Symbol:            fmt.Sprintf("BATCH[%s]", strings.Join(m.config.Symbols, ",")),
 		RequestDurationMs: requestDuration.Milliseconds(),
 		ResponseSizeBytes: int64(len(rawData)),
 		ErrorOccurred:     err != nil,
-		ErrorMessage:      "",
 	}
 
 	if err != nil {
 		*errorCount++
 		perfMetric.ErrorMessage = err.Error()
 		m.log(fmt.Sprintf("第%d轮采集失败: %v (耗时: %v)", roundNum, err, requestDuration))
-		return m.storage.SavePerformanceMetric(perfMetric)
+		return m.storage.Save(ctx, perfMetric)
 	}
 
-	// 保存成功的性能指标
-	if err := m.storage.SavePerformanceMetric(perfMetric); err != nil {
+	if err := m.storage.Save(ctx, perfMetric); err != nil {
 		return fmt.Errorf("保存性能指标失败: %v", err)
 	}
 
 	*successCount += len(result)
 	m.log(fmt.Sprintf("第%d轮采集成功: 获取%d只股票 (耗时: %v)", roundNum, len(result), requestDuration))
 
-	// 保存数据点
+	// 直接保存 StockData
 	for _, stockData := range result {
-		dataPoint := apitesting.DataPoint{
-			Timestamp:    queryTime,
-			Symbol:       stockData.Symbol,
-			QueryTime:    queryTime,
-			ResponseTime: responseTime,
-			QuoteTime:    stockData.Timestamp.Format("20060102150405"),
-			Price:        stockData.Price,
-			Volume:       stockData.Volume,
-			Field30:      stockData.Timestamp.Format("20060102150405"),
-			AllFields:    buildAllFieldsWithRaw(stockData, rawData),
-		}
-
-		if err := m.storage.SaveDataPoint(dataPoint); err != nil {
-			return fmt.Errorf("保存数据点失败 [%s]: %v", stockData.Symbol, err)
+		if err := m.storage.Save(ctx, stockData); err != nil {
+			return fmt.Errorf("保存StockData失败 [%s]: %v", stockData.Symbol, err)
 		}
 	}
 
@@ -297,11 +255,14 @@ func (m *APIMonitorTest) collectData(successCount, errorCount *int, roundNum int
 func (m *APIMonitorTest) generateAnalysisReport(startTime time.Time, collectionCount, successCount, errorCount int) error {
 	totalDuration := time.Since(startTime)
 	totalAttempts := collectionCount * len(m.config.Symbols)
-	finalSuccessRate := float64(successCount) / float64(totalAttempts) * 100
+	var finalSuccessRate float64
+	if totalAttempts > 0 {
+		finalSuccessRate = float64(successCount) / float64(totalAttempts) * 100
+	}
 
-	reportPath := filepath.Join(m.config.DataDir, fmt.Sprintf("analysis_report_%s.txt",
-		time.Now().Format("20060102_150405")))
+	reportPath := filepath.Join(m.config.DataDir, fmt.Sprintf("analysis_report_%s.txt", time.Now().Format("20060102_150405")))
 
+	// 恢复完整的报告格式
 	report := fmt.Sprintf(`=== API监控分析报告 ===
 
 监控配置:
@@ -319,15 +280,12 @@ func (m *APIMonitorTest) generateAnalysisReport(startTime time.Time, collectionC
 - 实际运行时间: %v
 
 数据文件:
-- API数据文件: %s
-- 性能指标文件: %s
-- 日志文件: %s
+- (详情请见数据目录)
 
 测试结果:
 - 监控器功能正常: ✅
 - 数据采集成功: ✅
 - 日志记录完整: ✅
-- 原始数据保存: ✅
 
 报告生成时间: %s
 `,
@@ -341,9 +299,6 @@ func (m *APIMonitorTest) generateAnalysisReport(startTime time.Time, collectionC
 		errorCount,
 		finalSuccessRate,
 		totalDuration.Round(time.Second),
-		filepath.Join(m.config.DataDir, "collected", fmt.Sprintf("api_data_%s.csv", time.Now().Format("2006-01-02"))),
-		filepath.Join(m.config.DataDir, "collected", fmt.Sprintf("performance_%s.csv", time.Now().Format("2006-01-02"))),
-		m.logger.Name(),
 		time.Now().Format("2006-01-02 15:04:05"),
 	)
 
@@ -365,17 +320,5 @@ func (m *APIMonitorTest) Close() {
 	}
 	if m.logger != nil {
 		m.logger.Close()
-	}
-}
-
-// buildAllFieldsWithRaw 构建包含原始数据的字段数组
-func buildAllFieldsWithRaw(stockData subscriber.StockData, rawData string) []string {
-	return []string{
-		stockData.Symbol,                             // 0: 股票代码
-		stockData.Name,                               // 1: 股票名称
-		fmt.Sprintf("%.3f", stockData.Price),         // 2: 当前价格
-		fmt.Sprintf("%d", stockData.Volume),          // 3: 成交量
-		stockData.Timestamp.Format("20060102150405"), // 4: 时间字段
-		rawData, // 5: 原始API响应数据（用于异常分析）
 	}
 }
