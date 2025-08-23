@@ -47,11 +47,11 @@ type LayeredCache struct {
 // LayeredCacheStats 分层缓存统计
 type LayeredCacheStats struct {
 	LayerStats   []core.CacheStats `json:"layer_stats"`
-	TotalHits    int64        `json:"total_hits"`
-	TotalMisses  int64        `json:"total_misses"`
-	PromoteCount int64        `json:"promote_count"`
-	WriteThrough int64        `json:"write_through"`
-	WriteBack    int64        `json:"write_back"`
+	TotalHits    int64             `json:"total_hits"`
+	TotalMisses  int64             `json:"total_misses"`
+	PromoteCount int64             `json:"promote_count"`
+	WriteThrough int64             `json:"write_through"`
+	WriteBack    int64             `json:"write_back"`
 }
 
 // NewLayeredCache 创建分层缓存
@@ -86,6 +86,9 @@ func NewLayeredCache(config LayeredCacheConfig) (*LayeredCache, error) {
 
 // createCacheLayer 创建单个缓存层
 func createCacheLayer(config LayerConfig, layerIndex int) (core.Cache, error) {
+	// 为调试和监控目的，可以根据层索引进行特殊处理
+	// 例如：为不同层设置不同的标识或配置
+
 	switch config.Type {
 	case LayerMemory:
 		memConfig := MemoryCacheConfig{
@@ -107,6 +110,7 @@ func createCacheLayer(config LayerConfig, layerIndex int) (core.Cache, error) {
 
 	case LayerDisk:
 		// TODO: 实现磁盘缓存层
+		// layerIndex 可用于确定磁盘缓存的存储路径
 		return NewMemoryCache(MemoryCacheConfig{
 			MaxSize:         config.MaxSize,
 			DefaultTTL:      config.TTL,
@@ -115,6 +119,7 @@ func createCacheLayer(config LayerConfig, layerIndex int) (core.Cache, error) {
 
 	case LayerRemote:
 		// TODO: 实现远程缓存层（如Redis）
+		// layerIndex 可用于选择不同的Redis实例或数据库
 		return NewMemoryCache(MemoryCacheConfig{
 			MaxSize:         config.MaxSize,
 			DefaultTTL:      config.TTL,
@@ -122,7 +127,7 @@ func createCacheLayer(config LayerConfig, layerIndex int) (core.Cache, error) {
 		}), nil
 
 	default:
-		return nil, fmt.Errorf("不支持的缓存层类型: %s", config.Type)
+		return nil, fmt.Errorf("不支持的缓存层类型: %s (层索引: %d)", config.Type, layerIndex)
 	}
 }
 

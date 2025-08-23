@@ -36,13 +36,13 @@ type StorageConfig struct {
 
 // CacheConfig 定义了缓存的配置。
 type CacheConfig struct {
-	Type            string        `json:"type" yaml:"type"`                       // 缓存类型，如 "memory", "layered"。
-	MaxSize         int64         `json:"max_size" yaml:"max_size"`               // 缓存中最多保留的条目数。
-	MaxMemory       int64         `json:"max_memory" yaml:"max_memory"`           // 缓存占用的最大内存（字节）。
-	TTL             time.Duration `json:"ttl" yaml:"ttl"`                         // 缓存条目的默认生存时间。
-	EvictionPolicy  string        `json:"eviction_policy" yaml:"eviction_policy"` // 缓存淘汰策略，如 "lru", "lfu", "fifo"。
+	Type            string        `json:"type" yaml:"type"`                         // 缓存类型，如 "memory", "layered"。
+	MaxSize         int64         `json:"max_size" yaml:"max_size"`                 // 缓存中最多保留的条目数。
+	MaxMemory       int64         `json:"max_memory" yaml:"max_memory"`             // 缓存占用的最大内存（字节）。
+	TTL             time.Duration `json:"ttl" yaml:"ttl"`                           // 缓存条目的默认生存时间。
+	EvictionPolicy  string        `json:"eviction_policy" yaml:"eviction_policy"`   // 缓存淘汰策略，如 "lru", "lfu", "fifo"。
 	CleanupInterval time.Duration `json:"cleanup_interval" yaml:"cleanup_interval"` // 清理过期缓存条目的时间间隔。
-	Layers          []LayerConfig `json:"layers" yaml:"layers"`                   // 当 Type 为 "layered" 时，定义各缓存层的配置。
+	Layers          []LayerConfig `json:"layers" yaml:"layers"`                     // 当 Type 为 "layered" 时，定义各缓存层的配置。
 }
 
 // LayerConfig 定义了分层缓存中每一层的具体配置。
@@ -63,53 +63,53 @@ type ProviderConfig struct {
 	ConcurrentLimit int               `json:"concurrent_limit" yaml:"concurrent_limit"` // 最大并发请求数。
 	RateLimitQPS    int               `json:"rate_limit_qps" yaml:"rate_limit_qps"`     // 每秒请求速率限制 (QPS)。
 	UserAgent       string            `json:"user_agent" yaml:"user_agent"`             // 发起HTTP请求时使用的User-Agent。
-	Headers         map[string]string `json:"headers" yaml:"headers"`               // 附加到HTTP请求中的自定义头部。
+	Headers         map[string]string `json:"headers" yaml:"headers"`                   // 附加到HTTP请求中的自定义头部。
 }
 
 // PerformanceConfig 定义了与性能相关的配置。
 type PerformanceConfig struct {
-	WorkerCount     int           `json:"worker_count" yaml:"worker_count"`               // 用于处理后台任务的工作协程数。
-	BatchSize       int           `json:"batch_size" yaml:"batch_size"`                   // 批处理操作的大小。
-	MaxConcurrency  int           `json:"max_concurrency" yaml:"max_concurrency"`         // 框架内部允许的最大并发数。
-	MemoryLimit     int64         `json:"memory_limit" yaml:"memory_limit"`               // 框架的总内存使用限制（字节）。
-	GCInterval      time.Duration `json:"gc_interval" yaml:"gc_interval"`                 // 强制进行垃圾回收（GC）的时间间隔。
-	MetricsInterval time.Duration `json:"metrics_interval" yaml:"metrics_interval"`       // 收集和报告性能指标的时间间隔。
-	EnableProfiling bool          `json:"enable_profiling" yaml:"enable_profiling"`       // 是否启用性能分析（如 pprof）。
-	EnableMetrics   bool          `json:"enable_metrics" yaml:"enable_metrics"`           // 是否启用指标收集。
+	WorkerCount     int           `json:"worker_count" yaml:"worker_count"`         // 用于处理后台任务的工作协程数。
+	BatchSize       int           `json:"batch_size" yaml:"batch_size"`             // 批处理操作的大小。
+	MaxConcurrency  int           `json:"max_concurrency" yaml:"max_concurrency"`   // 框架内部允许的最大并发数。
+	MemoryLimit     int64         `json:"memory_limit" yaml:"memory_limit"`         // 框架的总内存使用限制（字节）。
+	GCInterval      time.Duration `json:"gc_interval" yaml:"gc_interval"`           // 强制进行垃圾回收（GC）的时间间隔。
+	MetricsInterval time.Duration `json:"metrics_interval" yaml:"metrics_interval"` // 收集和报告性能指标的时间间隔。
+	EnableProfiling bool          `json:"enable_profiling" yaml:"enable_profiling"` // 是否启用性能分析（如 pprof）。
+	EnableMetrics   bool          `json:"enable_metrics" yaml:"enable_metrics"`     // 是否启用指标收集。
 }
 
 // LoggingConfig 定义了日志记录的配置。
 type LoggingConfig struct {
-	Level        string `json:"level" yaml:"level"`                   // 日志级别，如 "debug", "info", "warn", "error"。
-	Format       string `json:"format" yaml:"format"`                 // 日志格式，如 "json", "text"。
-	Output       string `json:"output" yaml:"output"`                 // 日志输出位置，如 "stdout", "file", "both"。
-	File         string `json:"file" yaml:"file"`                     // 日志文件的路径。
-	MaxSize      int    `json:"max_size" yaml:"max_size"`             // 日志文件的最大大小（MB）。
-	MaxBackups   int    `json:"max_backups" yaml:"max_backups"`       // 保留的旧日志文件的最大数量。
-	MaxAge       int    `json:"max_age" yaml:"max_age"`               // 日志文件的最大保留天数。
-	Compress     bool   `json:"compress" yaml:"compress"`             // 是否压缩归档的日志文件。
-	EnableCaller bool   `json:"enable_caller" yaml:"enable_caller"`   // 是否在日志中记录调用者的文件和行号。
-	EnableTrace  bool   `json:"enable_trace" yaml:"enable_trace"`     // 是否启用全链路跟踪日志。
+	Level        string `json:"level" yaml:"level"`                 // 日志级别，如 "debug", "info", "warn", "error"。
+	Format       string `json:"format" yaml:"format"`               // 日志格式，如 "json", "text"。
+	Output       string `json:"output" yaml:"output"`               // 日志输出位置，如 "stdout", "file", "both"。
+	File         string `json:"file" yaml:"file"`                   // 日志文件的路径。
+	MaxSize      int    `json:"max_size" yaml:"max_size"`           // 日志文件的最大大小（MB）。
+	MaxBackups   int    `json:"max_backups" yaml:"max_backups"`     // 保留的旧日志文件的最大数量。
+	MaxAge       int    `json:"max_age" yaml:"max_age"`             // 日志文件的最大保留天数。
+	Compress     bool   `json:"compress" yaml:"compress"`           // 是否压缩归档的日志文件。
+	EnableCaller bool   `json:"enable_caller" yaml:"enable_caller"` // 是否在日志中记录调用者的文件和行号。
+	EnableTrace  bool   `json:"enable_trace" yaml:"enable_trace"`   // 是否启用全链路跟踪日志。
 }
 
 // MockConfig 定义了Mock功能相关的配置。
 type MockConfig struct {
-	Enabled       bool                   `json:"enabled" yaml:"enabled"`             // 是否全局启用Mock模式。
-	ScenarioFile  string                 `json:"scenario_file" yaml:"scenario_file"` // 用于加载Mock场景的YAML文件路径。
-	DefaultDelay  time.Duration          `json:"default_delay" yaml:"default_delay"` // Mock响应的默认延迟。
-	ErrorRate     float64                `json:"error_rate" yaml:"error_rate"`       // 随机返回错误的概率 (0.0 to 1.0)。
+	Enabled       bool                   `json:"enabled" yaml:"enabled"`               // 是否全局启用Mock模式。
+	ScenarioFile  string                 `json:"scenario_file" yaml:"scenario_file"`   // 用于加载Mock场景的YAML文件路径。
+	DefaultDelay  time.Duration          `json:"default_delay" yaml:"default_delay"`   // Mock响应的默认延迟。
+	ErrorRate     float64                `json:"error_rate" yaml:"error_rate"`         // 随机返回错误的概率 (0.0 to 1.0)。
 	DataGenerator DataGenConfig          `json:"data_generator" yaml:"data_generator"` // 自动数据生成器的配置。
-	Scenarios     map[string]interface{} `json:"scenarios" yaml:"scenarios"`    // 直接在配置中以内联方式定义的Mock场景。
+	Scenarios     map[string]interface{} `json:"scenarios" yaml:"scenarios"`           // 直接在配置中以内联方式定义的Mock场景。
 }
 
 // DataGenConfig 定义了Mock数据自动生成器的配置。
 type DataGenConfig struct {
-	Enabled        bool          `json:"enabled" yaml:"enabled"`             // 是否启用自动数据生成。
-	StockCount     int           `json:"stock_count" yaml:"stock_count"`     // 生成的模拟股票数量。
-	PriceRange     [2]float64    `json:"price_range" yaml:"price_range"`     // 生成价格的范围 [min, max]。
-	VolumeRange    [2]int64      `json:"volume_range" yaml:"volume_range"`   // 生成成交量的范围 [min, max]。
+	Enabled        bool          `json:"enabled" yaml:"enabled"`                 // 是否启用自动数据生成。
+	StockCount     int           `json:"stock_count" yaml:"stock_count"`         // 生成的模拟股票数量。
+	PriceRange     [2]float64    `json:"price_range" yaml:"price_range"`         // 生成价格的范围 [min, max]。
+	VolumeRange    [2]int64      `json:"volume_range" yaml:"volume_range"`       // 生成成交量的范围 [min, max]。
 	UpdateInterval time.Duration `json:"update_interval" yaml:"update_interval"` // 随机数据更新的时间间隔。
-	Volatility     float64       `json:"volatility" yaml:"volatility"`       // 价格波动率。
+	Volatility     float64       `json:"volatility" yaml:"volatility"`           // 价格波动率。
 }
 
 // DefaultConfig 返回一个包含所有模块默认值的完整配置实例。
@@ -119,8 +119,8 @@ func DefaultConfig() *Config {
 		Storage: StorageConfig{
 			Type:         "csv",
 			Directory:    "./testdata",
-			MaxFileSize:  10 * 1024 * 1024,  // 测试环境：10MB（原100MB）
-			MaxFiles:     100,               // 测试环境：100个文件（原1000）
+			MaxFileSize:  10 * 1024 * 1024, // 测试环境：10MB（原100MB）
+			MaxFiles:     100,              // 测试环境：100个文件（原1000）
 			Compression:  false,
 			AutoCleanup:  true,
 			CleanupAge:   24 * time.Hour,
@@ -129,11 +129,11 @@ func DefaultConfig() *Config {
 		},
 		Cache: CacheConfig{
 			Type:            "memory",
-			MaxSize:         500,               // 测试环境：500条记录（原1000）
-			MaxMemory:       50 * 1024 * 1024,  // 测试环境：50MB（原100MB）
-			TTL:             2 * time.Hour,     // 测试环境：2小时（原24小时）
+			MaxSize:         500,              // 测试环境：500条记录（原1000）
+			MaxMemory:       50 * 1024 * 1024, // 测试环境：50MB（原100MB）
+			TTL:             2 * time.Hour,    // 测试环境：2小时（原24小时）
 			EvictionPolicy:  "lru",
-			CleanupInterval: 2 * time.Minute,   // 测试环境：2分钟（原5分钟）
+			CleanupInterval: 2 * time.Minute, // 测试环境：2分钟（原5分钟）
 			Layers: []LayerConfig{
 				{
 					Name:           "L1",
@@ -162,12 +162,12 @@ func DefaultConfig() *Config {
 			Headers:         make(map[string]string),
 		},
 		Performance: PerformanceConfig{
-			WorkerCount:     2,               // 测试环境：2个工作协程（原4）
-			BatchSize:       20,              // 测试环境：20条批处理（原50）
-			MaxConcurrency:  50,              // 测试环境：50并发（原100）
+			WorkerCount:     2,                 // 测试环境：2个工作协程（原4）
+			BatchSize:       20,                // 测试环境：20条批处理（原50）
+			MaxConcurrency:  50,                // 测试环境：50并发（原100）
 			MemoryLimit:     100 * 1024 * 1024, // 测试环境：100MB（原500MB）
-			GCInterval:      5 * time.Minute, // 测试环境：5分钟（原10分钟）
-			MetricsInterval: 30 * time.Second, // 测试环境：30秒（原1分钟）
+			GCInterval:      5 * time.Minute,   // 测试环境：5分钟（原10分钟）
+			MetricsInterval: 30 * time.Second,  // 测试环境：30秒（原1分钟）
 			EnableProfiling: false,
 			EnableMetrics:   true,
 		},
@@ -262,8 +262,7 @@ func SaveConfig(filename string, config *Config) error {
 
 // Validate 检查配置中的关键字段是否有效。
 func (c *Config) Validate() error {
-	var warnings []string
-	
+
 	// 验证存储配置
 	if c.Storage.Type == "" {
 		return fmt.Errorf("storage type is required")
@@ -342,14 +341,6 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("mock data_generator volatility cannot be negative")
 	}
 
-	// 输出警告信息（不阻止配置使用）
-	if len(warnings) > 0 {
-		fmt.Printf("⚠️ 配置警告:\n")
-		for _, warning := range warnings {
-			fmt.Printf("  - %s\n", warning)
-		}
-	}
-
 	return nil
 }
 
@@ -412,19 +403,19 @@ func DefaultConfigForEnvironment() *Config {
 		// 测试环境使用优化配置
 		return DefaultConfig()
 	}
-	
+
 	// 生产环境使用更保守的配置
 	config := DefaultConfig()
-	
+
 	// 生产环境调整配置
-	config.Storage.MaxFileSize = 50 * 1024 * 1024  // 生产环境：50MB
-	config.Storage.MaxFiles = 500                  // 生产环境：500个文件
-	config.Cache.MaxSize = 2000                    // 生产环境：2000条记录
-	config.Cache.MaxMemory = 200 * 1024 * 1024     // 生产环境：200MB
-	config.Cache.TTL = 12 * time.Hour              // 生产环境：12小时
-	config.Performance.MemoryLimit = 1 * 1024 * 1024 * 1024  // 生产环境：1GB
-	config.Performance.WorkerCount = 8             // 生产环境：8个工作协程
-	
+	config.Storage.MaxFileSize = 50 * 1024 * 1024           // 生产环境：50MB
+	config.Storage.MaxFiles = 500                           // 生产环境：500个文件
+	config.Cache.MaxSize = 2000                             // 生产环境：2000条记录
+	config.Cache.MaxMemory = 200 * 1024 * 1024              // 生产环境：200MB
+	config.Cache.TTL = 12 * time.Hour                       // 生产环境：12小时
+	config.Performance.MemoryLimit = 1 * 1024 * 1024 * 1024 // 生产环境：1GB
+	config.Performance.WorkerCount = 8                      // 生产环境：8个工作协程
+
 	return config
 }
 
@@ -493,14 +484,14 @@ func (c *Config) Clone() *Config {
 // SimpleConfig 是 Config 的简化版本，专为测试环境设计
 // 包含最常用的配置选项，减少配置复杂性
 type SimpleConfig struct {
-	StorageType     string        `json:"storage_type" yaml:"storage_type"`         // 存储类型
-	StorageDir      string        `json:"storage_dir" yaml:"storage_dir"`           // 存储目录
-	CacheType       string        `json:"cache_type" yaml:"cache_type"`             // 缓存类型
-	CacheSize       int64         `json:"cache_size" yaml:"cache_size"`             // 缓存大小
-	CacheTTL        time.Duration `json:"cache_ttl" yaml:"cache_ttl"`               // 缓存生存时间
-	ProviderType    string        `json:"provider_type" yaml:"provider_type"`       // Provider类型
-	MockEnabled     bool          `json:"mock_enabled" yaml:"mock_enabled"`         // 是否启用Mock
-	LogLevel        string        `json:"log_level" yaml:"log_level"`               // 日志级别
+	StorageType  string        `json:"storage_type" yaml:"storage_type"`   // 存储类型
+	StorageDir   string        `json:"storage_dir" yaml:"storage_dir"`     // 存储目录
+	CacheType    string        `json:"cache_type" yaml:"cache_type"`       // 缓存类型
+	CacheSize    int64         `json:"cache_size" yaml:"cache_size"`       // 缓存大小
+	CacheTTL     time.Duration `json:"cache_ttl" yaml:"cache_ttl"`         // 缓存生存时间
+	ProviderType string        `json:"provider_type" yaml:"provider_type"` // Provider类型
+	MockEnabled  bool          `json:"mock_enabled" yaml:"mock_enabled"`   // 是否启用Mock
+	LogLevel     string        `json:"log_level" yaml:"log_level"`         // 日志级别
 }
 
 // ToSimple 将完整配置转换为简化配置
@@ -520,7 +511,7 @@ func (c *Config) ToSimple() *SimpleConfig {
 // ToFull 将简化配置转换为完整配置
 func (s *SimpleConfig) ToFull() *Config {
 	full := DefaultConfig()
-	
+
 	// 只覆盖简化配置中指定的字段
 	if s.StorageType != "" {
 		full.Storage.Type = s.StorageType
@@ -544,7 +535,7 @@ func (s *SimpleConfig) ToFull() *Config {
 	if s.LogLevel != "" {
 		full.Logging.Level = s.LogLevel
 	}
-	
+
 	return full
 }
 
@@ -554,7 +545,7 @@ func DefaultSimpleConfig() *SimpleConfig {
 		StorageType:  "csv",
 		StorageDir:   "./testdata",
 		CacheType:    "memory",
-		CacheSize:    100,          // 测试环境：100条记录
+		CacheSize:    100,           // 测试环境：100条记录
 		CacheTTL:     1 * time.Hour, // 测试环境：1小时
 		ProviderType: "tencent",
 		MockEnabled:  false,
