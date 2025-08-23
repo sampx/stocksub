@@ -13,9 +13,10 @@ import (
 	"syscall"
 	"time"
 
+	"stocksub/pkg/limiter"
 	"stocksub/pkg/provider/tencent"
-	"stocksub/pkg/subscriber"
-	apitesting "stocksub/pkg/testing"
+	"stocksub/pkg/testkit/storage"
+	"stocksub/pkg/timing"
 )
 
 // MonitorConfig 监控配置
@@ -28,15 +29,29 @@ type MonitorConfig struct {
 	CleanupOnExit bool          `json:"cleanup_on_exit"`
 }
 
+// PerformanceMetric 定义了用于此监控器的性能指标结构
+type PerformanceMetric struct {
+	Timestamp         time.Time `json:"timestamp"`
+	Symbol            string    `json:"symbol"`
+	RequestDurationMs int64     `json:"request_duration_ms"`
+	ResponseSizeBytes int64     `json:"response_size_bytes"`
+	ErrorOccurred     bool      `json:"error_occurred"`
+	ErrorMessage      string    `json:"error_message"`
+}
+
 // APIMonitor API监控器
 type APIMonitor struct {
-	config   MonitorConfig
-	provider *tencent.Provider
-	storage  *apitesting.CSVStorage
-	logger   *log.Logger
-	logFile  *os.File
-	cancel   context.CancelFunc
-	stopped  bool
+	config            MonitorConfig
+	provider          *tencent.Provider
+	storage           *storage.CSVStorage
+	logger            *log.Logger
+	logFile           *os.File
+	cancel            context.CancelFunc
+	stopped           bool
+
+	// 安全组件
+	marketTime        *timing.MarketTime
+	intelligentLimiter *limiter.IntelligentLimiter
 }
 
 func main() {
@@ -150,14 +165,25 @@ func NewAPIMonitor(config MonitorConfig) (*APIMonitor, error) {
 	provider.SetRateLimit(1 * time.Second)
 
 	// 创建存储器
-	storage := apitesting.NewCSVStorage(config.DataDir)
+	storageCfg := storage.DefaultCSVStorageConfig()
+	storageCfg.Directory = config.DataDir
+	csvStorage, err := storage.NewCSVStorage(storageCfg)
+	if err != nil {
+		return nil, fmt.Errorf("创建CSVStorage失败: %w", err)
+	}
+
+	// 创建安全组件
+	marketTime := timing.DefaultMarketTime()
+	intelligentLimiter := limiter.NewIntelligentLimiter(marketTime)
 
 	monitor := &APIMonitor{
-		config:   config,
-		provider: provider,
-		storage:  storage,
-		logger:   logger,
-		logFile:  logFile,
+		config:            config,
+		provider:          provider,
+		storage:           csvStorage,
+		logger:            logger,
+		logFile:           logFile,
+		marketTime:        marketTime,
+		intelligentLimiter: intelligentLimiter,
 	}
 
 	logger.Printf("API监控器初始化完成: 股票%v, 时长%v, 间隔%v",
@@ -169,15 +195,19 @@ func NewAPIMonitor(config MonitorConfig) (*APIMonitor, error) {
 // Run 运行监控
 func (m *APIMonitor) Run(ctx context.Context) error {
 	startTime := time.Now()
-	endTime := startTime.Add(m.config.Duration)
+
+	// 初始化智能限制器
+	m.intelligentLimiter.InitializeBatch(m.config.Symbols)
 
 	m.logger.Printf("开始监控: %v", startTime.Format("2006-01-02 15:04:05"))
+	m.logger.Printf("交易时间检查: %t", m.marketTime.IsTradingTime())
 
 	collectionCount := 0
 	successCount := 0
 	errorCount := 0
 
-	for time.Now().Before(endTime) {
+	// 主循环：使用智能限制器的安全逻辑
+	for {
 		select {
 		case <-ctx.Done():
 			m.logger.Printf("收到取消信号，正在安全关闭...")
@@ -186,39 +216,73 @@ func (m *APIMonitor) Run(ctx context.Context) error {
 			// 继续执行
 		}
 
+		// 检查是否可以继续进行API调用
+		shouldProceed, err := m.intelligentLimiter.ShouldProceed(ctx)
+		if err != nil {
+			m.logger.Printf("智能限制器终止: %v", err)
+			// 安全终止：不是错误，而是正常的安全停止
+			break
+		}
+
+		if !shouldProceed {
+			m.logger.Printf("智能限制器指示不可继续，安全停止")
+			break
+		}
+
 		iterationStart := time.Now()
 		collectionCount++
 
-		if err := m.collectData(&successCount, &errorCount, collectionCount); err != nil {
-			m.logger.Printf("第%d轮采集出现错误: %v", collectionCount, err)
+		// 执行数据采集并记录结果
+		shouldContinue, waitDuration, finalErr := m.collectDataWithLimiter(ctx, &successCount, &errorCount, collectionCount)
+
+		if finalErr != nil {
+			m.logger.Printf("致命错误，终止监控: %v", finalErr)
+			break
+		}
+
+		if !shouldContinue {
+			if waitDuration > 0 {
+				// 需要等待重试
+				m.logger.Printf("等待 %v 后重试...", waitDuration)
+				select {
+				case <-time.After(waitDuration):
+					// 继续下一轮
+					continue
+				case <-ctx.Done():
+					m.logger.Printf("等待期间收到取消信号")
+					return nil
+				}
+			} else {
+				// 需要终止
+				m.logger.Printf("智能限制器指示终止采集")
+				break
+			}
 		}
 
 		// 每10轮打印进度
 		if collectionCount%10 == 0 {
 			elapsed := time.Since(startTime)
-			remaining := m.config.Duration - elapsed
 			totalAttempts := collectionCount * len(m.config.Symbols)
 			currentSuccessRate := float64(successCount) / float64(totalAttempts) * 100
 
-			m.logger.Printf("进度: 已运行 %v，剩余 %v，第%d轮，数据点成功率 %.1f%%",
+			m.logger.Printf("进度: 已运行 %v，第%d轮，数据点成功率 %.1f%%",
 				elapsed.Round(time.Second),
-				remaining.Round(time.Second),
 				collectionCount,
 				currentSuccessRate)
 
 			// 同时输出到控制台
-			fmt.Printf("进度: 第%d轮，成功率 %.1f%%, 剩余 %v\n",
-				collectionCount, currentSuccessRate, remaining.Round(time.Second))
+			fmt.Printf("进度: 第%d轮，成功率 %.1f%%, 已运行 %v\n",
+				collectionCount, currentSuccessRate, elapsed.Round(time.Second))
 		}
 
-		// 等待下一次采集
+		// 等待下一次采集（但不超过配置的间隔）
 		sleepTime := m.config.Interval - time.Since(iterationStart)
 		if sleepTime > 0 {
 			select {
 			case <-time.After(sleepTime):
 				// 正常继续
 			case <-ctx.Done():
-				m.logger.Printf("收到取消信号，正在安全关闭...")
+				m.logger.Printf("等待期间收到取消信号")
 				return nil
 			}
 		}
@@ -232,19 +296,20 @@ func (m *APIMonitor) Run(ctx context.Context) error {
 	return nil
 }
 
-// collectData 执行一轮数据采集
-func (m *APIMonitor) collectData(successCount, errorCount *int, roundNum int) error {
+// collectDataWithLimiter 执行一轮数据采集（使用智能限制器）
+func (m *APIMonitor) collectDataWithLimiter(ctx context.Context, successCount, errorCount *int, roundNum int) (
+	shouldContinue bool, waitingDuration time.Duration, finalError error) {
+
 	queryTime := time.Now()
 
 	// 一次API调用获取所有股票数据
-	ctx := context.Background()
 	result, rawData, err := m.provider.FetchDataWithRaw(ctx, m.config.Symbols)
 
 	responseTime := time.Now()
 	requestDuration := responseTime.Sub(queryTime)
 
 	// 记录性能指标（每个请求一条记录）
-	perfMetric := apitesting.PerformanceMetric{
+	perfMetric := PerformanceMetric{
 		Timestamp:         queryTime,
 		Symbol:            strings.Join(m.config.Symbols, ","), // 多股票用逗号分隔
 		RequestDurationMs: requestDuration.Milliseconds(),
@@ -254,43 +319,45 @@ func (m *APIMonitor) collectData(successCount, errorCount *int, roundNum int) er
 	}
 
 	if err != nil {
-		*errorCount++
 		perfMetric.ErrorMessage = err.Error()
 		m.logger.Printf("第%d轮采集失败: %v (耗时: %v)", roundNum, err, requestDuration)
 
 		// 保存失败的性能指标
-		return m.storage.SavePerformanceMetric(perfMetric)
-	}
-
-	// 保存成功的性能指标
-	if err := m.storage.SavePerformanceMetric(perfMetric); err != nil {
-		return fmt.Errorf("保存性能指标失败: %v", err)
-	}
-
-	// 处理成功获取的数据
-	*successCount += len(result)
-	m.logger.Printf("第%d轮采集成功: 获取%d只股票 (耗时: %v)", roundNum, len(result), requestDuration)
-
-	// 为每只股票保存数据点
-	for _, stockData := range result {
-		dataPoint := apitesting.DataPoint{
-			Timestamp:    queryTime,
-			Symbol:       stockData.Symbol,
-			QueryTime:    queryTime,
-			ResponseTime: responseTime,
-			QuoteTime:    stockData.Timestamp.Format("20060102150405"),
-			Price:        stockData.Price,
-			Volume:       stockData.Volume,
-			Field30:      stockData.Timestamp.Format("20060102150405"),
-			AllFields:    buildAllFieldsWithRaw(stockData, rawData),
+		if saveErr := m.storage.Save(ctx, perfMetric); saveErr != nil {
+			m.logger.Printf("保存性能指标失败: %v", saveErr)
 		}
 
-		if err := m.storage.SaveDataPoint(dataPoint); err != nil {
-			return fmt.Errorf("保存数据点失败 [%s]: %v", stockData.Symbol, err)
+		*errorCount++
+	} else {
+		// 成功情况
+		m.logger.Printf("第%d轮采集成功: 获取%d只股票 (耗时: %v)", roundNum, len(result), requestDuration)
+
+		// 保存成功的性能指标
+		if saveErr := m.storage.Save(ctx, perfMetric); saveErr != nil {
+			m.logger.Printf("保存性能指标失败: %v", saveErr)
+		}
+
+		// 为每只股票保存数据点
+		*successCount += len(result)
+		for _, stockData := range result {
+			if saveErr := m.storage.Save(ctx, stockData); saveErr != nil {
+				m.logger.Printf("保存数据点失败 [%s]: %v", stockData.Symbol, saveErr)
+			}
 		}
 	}
 
-	return nil
+	// 将结果提交给智能限制器判断
+	var responseData []string
+	if err == nil && len(result) > 0 {
+		// 构建响应数据用于一致性检查
+		responseData = make([]string, len(result))
+		for i, stockData := range result {
+			responseData[i] = fmt.Sprintf("%s,%.2f,%d", stockData.Symbol, stockData.Price, int(stockData.Volume))
+		}
+	}
+
+	// 记录结果并获取下一步指示
+	return m.intelligentLimiter.RecordResult(err, responseData)
 }
 
 // finishAndAnalyze 完成监控并分析数据
@@ -420,17 +487,4 @@ func cleanupOldData(dataDir string) error {
 	}
 
 	return nil
-}
-
-// buildAllFieldsWithRaw 构建包含原始数据的字段数组
-func buildAllFieldsWithRaw(stockData subscriber.StockData, rawData string) []string {
-	fields := []string{
-		stockData.Symbol,                             // 0: 股票代码
-		stockData.Name,                               // 1: 股票名称
-		fmt.Sprintf("%.3f", stockData.Price),         // 2: 当前价格
-		fmt.Sprintf("%d", stockData.Volume),          // 3: 成交量
-		stockData.Timestamp.Format("20060102150405"), // 4: 时间字段
-		rawData, // 5: 原始API响应数据（关键）
-	}
-	return fields
 }

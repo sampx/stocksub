@@ -1,7 +1,18 @@
 .DS_Store
 
-doc/plans/
+docs/
 doc/learn/
+doc/plans/
 
 dist/
 tests/data/
+.vscode/settings.json
+build/
+
+# ai
+.claude/
+.continue/
+.Qoder/
+CLAUDE.md
+QWEN.md
+GEMINI.md
