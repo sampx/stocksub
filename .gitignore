@@ -13,6 +13,7 @@ build/
 .claude/
 .continue/
 .Qoder/
+.kiro/
 CLAUDE.md
 QWEN.md
 GEMINI.md
