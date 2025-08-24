@@ -130,12 +130,12 @@ func (dc *DiskCache) Get(ctx context.Context, key string) (interface{}, error) {
 
 // Set 向磁盘缓存设置数据
 func (dc *DiskCache) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
-	dc.mu.RLock()
+	dc.mu.Lock()
+	defer dc.mu.Unlock()
+
 	if dc.closed {
-		dc.mu.RUnlock()
 		return fmt.Errorf("cache is closed")
 	}
-	dc.mu.RUnlock()
 
 	if ttl <= 0 {
 		ttl = dc.config.DefaultTTL
@@ -158,10 +158,6 @@ func (dc *DiskCache) Set(ctx context.Context, key string, value interface{}, ttl
 		return fmt.Errorf("写入磁盘失败: %w", err)
 	}
 
-	// 更新内存元数据
-	dc.mu.Lock()
-	defer dc.mu.Unlock()
-
 	// 检查是否超过最大大小
 	if int64(len(dc.entries)) >= dc.config.MaxSize && dc.config.MaxSize > 0 {
 		// 简单策略：删除最旧的条目
@@ -177,8 +173,8 @@ func (dc *DiskCache) Set(ctx context.Context, key string, value interface{}, ttl
 			oldEntry := dc.entries[oldestKey]
 			delete(dc.entries, oldestKey)
 			dc.stats.Size--
-			// 异步删除磁盘文件
-			go os.Remove(oldEntry.Filepath)
+			// 同步删除磁盘文件以避免死锁
+			os.Remove(oldEntry.Filepath)
 		}
 	}
 

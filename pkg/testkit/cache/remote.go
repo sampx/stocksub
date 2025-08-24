@@ -121,41 +121,6 @@ func (rc *RemoteCacheBase) updateStats(hit bool) {
 	}
 }
 
-// RemoteCacheFactory 远程缓存工厂接口
-type RemoteCacheFactory interface {
-	// CreateRemoteCache 创建远程缓存实例
-	CreateRemoteCache(config RemoteCacheConfig) (RemoteCache, error)
-	
-	// Protocol 返回支持的协议
-	Protocol() string
-}
-
-// redisCacheFactory Redis缓存工厂
-type redisCacheFactory struct{}
-
-func (f *redisCacheFactory) Protocol() string {
-	return "redis"
-}
-
-func (f *redisCacheFactory) CreateRemoteCache(config RemoteCacheConfig) (RemoteCache, error) {
-	// TODO: 实现Redis客户端连接
-	// 返回一个模拟实现用于测试
-	return NewMockRemoteCache(config), nil
-}
-
-// memcachedCacheFactory Memcached缓存工厂
-type memcachedCacheFactory struct{}
-
-func (f *memcachedCacheFactory) Protocol() string {
-	return "memcached"
-}
-
-func (f *memcachedCacheFactory) CreateRemoteCache(config RemoteCacheConfig) (RemoteCache, error) {
-	// TODO: 实现Memcached客户端连接
-	// 返回一个模拟实现用于测试
-	return NewMockRemoteCache(config), nil
-}
-
 // MockRemoteCache 模拟远程缓存实现（用于测试和开发）
 type MockRemoteCache struct {
 	*RemoteCacheBase

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -31,6 +32,7 @@ type LayerFactory interface {
 // LayerConfig 缓存层配置
 type LayerConfig struct {
 	Type            LayerType     `yaml:"type"`
+	Path            string        `yaml:"path"`           // 缓存路径（主要用于磁盘缓存）
 	MaxSize         int64         `yaml:"max_size"`
 	TTL             time.Duration `yaml:"ttl"`
 	Enabled         bool          `yaml:"enabled"`
@@ -87,10 +89,8 @@ func NewLayeredCacheWithFactories(config LayeredCacheConfig, customFactories map
 	
 	// 初始化默认工厂注册表
 	factories := make(map[LayerType]LayerFactory)
-	if customFactories != nil {
-		for layerType, factory := range customFactories {
-			factories[layerType] = factory
-		}
+	for layerType, factory := range customFactories {
+		factories[layerType] = factory
 	}
 	
 	// 注册默认工厂
@@ -469,6 +469,12 @@ func (lc *LayeredCache) BatchGet(ctx context.Context, keys []string) (map[string
 					if lc.config.PromoteEnabled && i > 0 {
 						lc.asyncPromoteToUpperLayers(ctx, key, value, i)
 					}
+				} else {
+					// 如果不是缓存未命中错误，则这是一个需要报告的真实错误
+					var testKitErr *core.TestKitError
+					if !errors.As(err, &testKitErr) || testKitErr.Code != core.ErrCacheMiss {
+						return nil, fmt.Errorf("缓存层 %d (%s) 获取失败: %w", i, lc.getLayerType(i), err)
+					}
 				}
 			}
 		}
@@ -645,12 +651,18 @@ func (f *diskLayerFactory) LayerType() LayerType {
 }
 
 func (f *diskLayerFactory) CreateLayer(config LayerConfig, layerIndex int) (core.Cache, error) {
+	// 优先使用配置中指定的路径，如果为空则使用系统临时目录
+	baseDir := config.Path
+	if baseDir == "" {
+		baseDir = os.TempDir()
+	}
+
 	diskConfig := DiskCacheConfig{
-		BaseDir:         "./cache_data", // 默认缓存目录
+		BaseDir:         baseDir,
 		MaxSize:         config.MaxSize,
 		DefaultTTL:      config.TTL,
 		CleanupInterval: config.CleanupInterval,
-		FilePrefix:      fmt.Sprintf("layer_%d", layerIndex),
+		FilePrefix:      fmt.Sprintf("stocksub_layer_%d", layerIndex),
 	}
 	return NewDiskCache(diskConfig)
 }

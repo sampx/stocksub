@@ -1,3 +1,4 @@
+
 package cache
 
 import (
@@ -48,7 +49,7 @@ func TestMemoryCache_BasicOperations(t *testing.T) {
 	assert.Equal(t, core.ErrCacheMiss, testKitErr.Code)
 }
 
-// 测试MemoryCache的TTL功能
+// TestMemoryCache_TTL 测试MemoryCache的TTL功能，并验证过期条目在Get时被删除
 func TestMemoryCache_TTL(t *testing.T) {
 	config := MemoryCacheConfig{
 		MaxSize:         100,
@@ -62,16 +63,14 @@ func TestMemoryCache_TTL(t *testing.T) {
 	ctx := context.Background()
 
 	// 设置一个短TTL的值
-	err := cache.Set(ctx, "key1", "value1", 100*time.Millisecond)
+	err := cache.Set(ctx, "key1", "value1", 50*time.Millisecond)
 	assert.NoError(t, err)
 
-	// 立即获取应该成功
-	value, err := cache.Get(ctx, "key1")
-	assert.NoError(t, err)
-	assert.Equal(t, "value1", value)
+	// 确认条目存在
+	assert.Equal(t, int64(1), cache.Stats().Size)
 
 	// 等待过期
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(60 * time.Millisecond)
 
 	// 再次获取应该失败
 	_, err = cache.Get(ctx, "key1")
@@ -79,6 +78,13 @@ func TestMemoryCache_TTL(t *testing.T) {
 	var testKitErr *core.TestKitError
 	assert.ErrorAs(t, err, &testKitErr)
 	assert.Equal(t, core.ErrCacheMiss, testKitErr.Code)
+
+	// 验证条目已在Get操作中被删除
+	cache.mu.RLock()
+	_, exists := cache.entries["key1"]
+	cache.mu.RUnlock()
+	assert.False(t, exists, "Expired entry should be deleted on Get")
+	assert.Equal(t, int64(0), cache.Stats().Size)
 }
 
 // 测试MemoryCache统计信息
@@ -195,6 +201,14 @@ func TestMemoryCache_EvictOldest(t *testing.T) {
 	assert.Equal(t, core.ErrCacheMiss, testKitErr.Code)
 }
 
+// 测试estimateSize函数的所有分支
+func TestEstimateSize(t *testing.T) {
+	assert.Equal(t, int64(5), estimateSize("hello"))
+	assert.Equal(t, int64(10), estimateSize([]byte("0123456789")))
+	assert.Equal(t, int64(64), estimateSize(12345)) // default case
+	assert.Equal(t, int64(64), estimateSize(struct{}{})) // default case
+}
+
 // MemoryCache基准测试
 func BenchmarkMemoryCache_Set(b *testing.B) {
 	config := MemoryCacheConfig{
@@ -240,4 +254,40 @@ func BenchmarkMemoryCache_Get(b *testing.B) {
 		key := fmt.Sprintf("key%d", i%1000)
 		cache.Get(ctx, key)
 	}
+}
+
+// 测试MemoryCache的cleanup方法
+func TestMemoryCache_Cleanup(t *testing.T) {
+	config := MemoryCacheConfig{
+		MaxSize:         100,
+		DefaultTTL:      50 * time.Millisecond,
+		CleanupInterval: 10 * time.Millisecond,
+	}
+
+	cache := NewMemoryCache(config)
+	defer cache.Close()
+
+	ctx := context.Background()
+
+	// 添加一些会过期的条目
+	cache.Set(ctx, "key1", "value1", 50*time.Millisecond)
+	cache.Set(ctx, "key2", "value2", 50*time.Millisecond)
+	cache.Set(ctx, "key3", "value3", 1*time.Hour) // 不会过期的
+
+	// 等待过期和清理
+	time.Sleep(100 * time.Millisecond)
+
+	// 验证过期的条目已被清理
+	_, err := cache.Get(ctx, "key1")
+	assert.Error(t, err)
+	_, err = cache.Get(ctx, "key2")
+	assert.Error(t, err)
+
+	// 验证未过期的条目仍然存在
+	_, err = cache.Get(ctx, "key3")
+	assert.NoError(t, err)
+
+	// 检查统计信息
+	stats := cache.Stats()
+	assert.Equal(t, int64(1), stats.Size)
 }
