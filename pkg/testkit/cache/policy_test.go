@@ -1,3 +1,4 @@
+
 package cache
 
 import (
@@ -10,14 +11,14 @@ import (
 )
 
 func TestLRUPolicy(t *testing.T) {
-	policy := NewLRUPolicy()
+	policy := NewEvictionPolicy(PolicyLRU)
 	entries := make(map[string]*core.CacheEntry)
 
-	entry1 := &core.CacheEntry{CreateTime: time.Now()}
-	time.Sleep(1 * time.Millisecond) // ensure create times are different
-	entry2 := &core.CacheEntry{CreateTime: time.Now()}
+	entry1 := &core.CacheEntry{CreateTime: time.Now(), AccessTime: time.Now()}
 	time.Sleep(1 * time.Millisecond)
-	entry3 := &core.CacheEntry{CreateTime: time.Now()}
+	entry2 := &core.CacheEntry{CreateTime: time.Now(), AccessTime: time.Now()}
+	time.Sleep(1 * time.Millisecond)
+	entry3 := &core.CacheEntry{CreateTime: time.Now(), AccessTime: time.Now()}
 
 	entries["1"] = entry1
 	policy.OnAdd("1", entry1)
@@ -26,19 +27,17 @@ func TestLRUPolicy(t *testing.T) {
 	entries["3"] = entry3
 	policy.OnAdd("3", entry3)
 
-	// 访问 entry1, 模拟SmartCache行为
+	// 访问 entry1, 模拟SmartCache行为，更新AccessTime
+	entry1.AccessTime = time.Now()
 	policy.OnAccess("1", entry1)
 
-	// 访问 entry2
-	policy.OnAccess("2", entry2)
-
-	// 淘汰时，应该淘汰 entry3 (最近最少访问)
+	// 淘汰时，应该淘汰 entry2 (最久未访问)
 	toEvict := policy.ShouldEvict(entries)
-	assert.Contains(t, toEvict, "3")
+	assert.Contains(t, toEvict, "2")
 }
 
 func TestLFUPolicy(t *testing.T) {
-	policy := NewLFUPolicy()
+	policy := NewEvictionPolicy(PolicyLFU)
 	entries := make(map[string]*core.CacheEntry)
 
 	entry1 := &core.CacheEntry{}
@@ -65,7 +64,7 @@ func TestLFUPolicy(t *testing.T) {
 }
 
 func TestFIFOPolicy(t *testing.T) {
-	policy := NewFIFOPolicy()
+	policy := NewEvictionPolicy(PolicyFIFO)
 	entries := make(map[string]*core.CacheEntry)
 
 	entry1 := &core.CacheEntry{CreateTime: time.Now()}
@@ -90,7 +89,7 @@ func TestFIFOPolicy(t *testing.T) {
 }
 
 func TestFIFOPolicy_OnAccess(t *testing.T) {
-	policy := NewFIFOPolicy()
+	policy := NewEvictionPolicy(PolicyFIFO)
 	entry := &core.CacheEntry{}
 	policy.OnAdd("1", entry)
 

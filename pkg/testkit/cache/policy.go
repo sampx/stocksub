@@ -30,74 +30,80 @@ type EvictionPolicy interface {
 func NewEvictionPolicy(policyType PolicyType) EvictionPolicy {
 	switch policyType {
 	case PolicyLRU:
-		return NewLRUPolicy()
+		return newLRUPolicy()
 	case PolicyLFU:
-		return NewLFUPolicy()
+		return newLFUPolicy()
 	case PolicyFIFO:
-		return NewFIFOPolicy()
+		return newFIFOPolicy()
 	default:
-		return NewLRUPolicy() // 默认使用LRU
+		return newLRUPolicy() // 默认使用LRU
 	}
 }
 
-// LRUPolicy LRU淘汰策略
-type LRUPolicy struct {
+// lruPolicy LRU淘汰策略
+type lruPolicy struct {
 	mu       sync.Mutex
 	lruList  *list.List
 	lruIndex map[string]*list.Element
 }
 
-// LRUEntry LRU条目
-type LRUEntry struct {
+// lruEntry LRU条目
+type lruEntry struct {
 	Key        string
 	AccessTime time.Time
 }
 
-// NewLRUPolicy 创建LRU策略
-func NewLRUPolicy() *LRUPolicy {
-	return &LRUPolicy{
+// newLRUPolicy 创建LRU策略
+func newLRUPolicy() *lruPolicy {
+	return &lruPolicy{
 		lruList:  list.New(),
 		lruIndex: make(map[string]*list.Element),
 	}
 }
 
 // ShouldEvict 确定应该淘汰的键
-func (lru *LRUPolicy) ShouldEvict(entries map[string]*core.CacheEntry) []string {
+func (lru *lruPolicy) ShouldEvict(entries map[string]*core.CacheEntry) []string {
 	lru.mu.Lock()
 	defer lru.mu.Unlock()
 
-	// 如果没有设置最大大小限制，不淘汰
 	if len(entries) == 0 {
 		return nil
 	}
 
-	// 找到链表末尾的元素（最近最少使用的元素）
-	if elem := lru.lruList.Back(); elem != nil {
-		lruEntry := elem.Value.(*LRUEntry)
-		return []string{lruEntry.Key}
+	var oldestKey string
+	var oldestTime time.Time
+
+	for key, entry := range entries {
+		if oldestKey == "" || entry.AccessTime.Before(oldestTime) {
+			oldestKey = key
+			oldestTime = entry.AccessTime
+		}
+	}
+
+	if oldestKey != "" {
+		return []string{oldestKey}
 	}
 
 	return nil
 }
 
 // OnAccess 访问时的回调
-func (lru *LRUPolicy) OnAccess(key string, entry *core.CacheEntry) {
+func (lru *lruPolicy) OnAccess(key string, entry *core.CacheEntry) {
 	lru.mu.Lock()
 	defer lru.mu.Unlock()
 
-	// 移动到链表前端
 	if elem, exists := lru.lruIndex[key]; exists {
 		lru.lruList.MoveToFront(elem)
-		elem.Value.(*LRUEntry).AccessTime = time.Now()
+		elem.Value.(*lruEntry).AccessTime = time.Now()
 	}
 }
 
 // OnAdd 添加时的回调
-func (lru *LRUPolicy) OnAdd(key string, entry *core.CacheEntry) {
+func (lru *lruPolicy) OnAdd(key string, entry *core.CacheEntry) {
 	lru.mu.Lock()
 	defer lru.mu.Unlock()
 
-	lruEntry := &LRUEntry{
+	lruEntry := &lruEntry{
 		Key:        key,
 		AccessTime: time.Now(),
 	}
@@ -107,7 +113,7 @@ func (lru *LRUPolicy) OnAdd(key string, entry *core.CacheEntry) {
 }
 
 // OnRemove 移除时的回调
-func (lru *LRUPolicy) OnRemove(key string, entry *core.CacheEntry) {
+func (lru *lruPolicy) OnRemove(key string, entry *core.CacheEntry) {
 	lru.mu.Lock()
 	defer lru.mu.Unlock()
 
@@ -117,21 +123,21 @@ func (lru *LRUPolicy) OnRemove(key string, entry *core.CacheEntry) {
 	}
 }
 
-// LFUPolicy LFU淘汰策略
-type LFUPolicy struct {
+// lfuPolicy LFU淘汰策略
+type lfuPolicy struct {
 	mu          sync.Mutex
 	frequencies map[string]int64
 }
 
-// NewLFUPolicy 创建LFU策略
-func NewLFUPolicy() *LFUPolicy {
-	return &LFUPolicy{
+// newLFUPolicy 创建LFU策略
+func newLFUPolicy() *lfuPolicy {
+	return &lfuPolicy{
 		frequencies: make(map[string]int64),
 	}
 }
 
 // ShouldEvict 确定应该淘汰的键
-func (lfu *LFUPolicy) ShouldEvict(entries map[string]*core.CacheEntry) []string {
+func (lfu *lfuPolicy) ShouldEvict(entries map[string]*core.CacheEntry) []string {
 	lfu.mu.Lock()
 	defer lfu.mu.Unlock()
 
@@ -139,7 +145,6 @@ func (lfu *LFUPolicy) ShouldEvict(entries map[string]*core.CacheEntry) []string 
 		return nil
 	}
 
-	// 找到访问频率最低的键
 	var minFreq int64 = -1
 	var evictKey string
 
@@ -159,7 +164,7 @@ func (lfu *LFUPolicy) ShouldEvict(entries map[string]*core.CacheEntry) []string 
 }
 
 // OnAccess 访问时的回调
-func (lfu *LFUPolicy) OnAccess(key string, entry *core.CacheEntry) {
+func (lfu *lfuPolicy) OnAccess(key string, entry *core.CacheEntry) {
 	lfu.mu.Lock()
 	defer lfu.mu.Unlock()
 
@@ -167,7 +172,7 @@ func (lfu *LFUPolicy) OnAccess(key string, entry *core.CacheEntry) {
 }
 
 // OnAdd 添加时的回调
-func (lfu *LFUPolicy) OnAdd(key string, entry *core.CacheEntry) {
+func (lfu *lfuPolicy) OnAdd(key string, entry *core.CacheEntry) {
 	lfu.mu.Lock()
 	defer lfu.mu.Unlock()
 
@@ -175,36 +180,36 @@ func (lfu *LFUPolicy) OnAdd(key string, entry *core.CacheEntry) {
 }
 
 // OnRemove 移除时的回调
-func (lfu *LFUPolicy) OnRemove(key string, entry *core.CacheEntry) {
+func (lfu *lfuPolicy) OnRemove(key string, entry *core.CacheEntry) {
 	lfu.mu.Lock()
 	defer lfu.mu.Unlock()
 
 	delete(lfu.frequencies, key)
 }
 
-// FIFOPolicy FIFO淘汰策略
-type FIFOPolicy struct {
+// fifoPolicy FIFO淘汰策略
+type fifoPolicy struct {
 	mu    sync.Mutex
 	queue *list.List
 	index map[string]*list.Element
 }
 
-// FIFOEntry FIFO条目
-type FIFOEntry struct {
+// fifoEntry FIFO条目
+type fifoEntry struct {
 	Key        string
 	CreateTime time.Time
 }
 
-// NewFIFOPolicy 创建FIFO策略
-func NewFIFOPolicy() *FIFOPolicy {
-	return &FIFOPolicy{
+// newFIFOPolicy 创建FIFO策略
+func newFIFOPolicy() *fifoPolicy {
+	return &fifoPolicy{
 		queue: list.New(),
 		index: make(map[string]*list.Element),
 	}
 }
 
 // ShouldEvict 确定应该淘汰的键
-func (fifo *FIFOPolicy) ShouldEvict(entries map[string]*core.CacheEntry) []string {
+func (fifo *fifoPolicy) ShouldEvict(entries map[string]*core.CacheEntry) []string {
 	fifo.mu.Lock()
 	defer fifo.mu.Unlock()
 
@@ -212,7 +217,6 @@ func (fifo *FIFOPolicy) ShouldEvict(entries map[string]*core.CacheEntry) []strin
 		return nil
 	}
 
-	// 找到创建时间最早的键
 	var oldestKey string
 	var oldestTime time.Time
 
@@ -231,16 +235,16 @@ func (fifo *FIFOPolicy) ShouldEvict(entries map[string]*core.CacheEntry) []strin
 }
 
 // OnAccess 访问时的回调（FIFO不需要处理访问）
-func (fifo *FIFOPolicy) OnAccess(key string, entry *core.CacheEntry) {
+func (fifo *fifoPolicy) OnAccess(key string, entry *core.CacheEntry) {
 	// FIFO策略不需要处理访问事件
 }
 
 // OnAdd 添加时的回调
-func (fifo *FIFOPolicy) OnAdd(key string, entry *core.CacheEntry) {
+func (fifo *fifoPolicy) OnAdd(key string, entry *core.CacheEntry) {
 	fifo.mu.Lock()
 	defer fifo.mu.Unlock()
 
-	fifoEntry := &FIFOEntry{
+	fifoEntry := &fifoEntry{
 		Key:        key,
 		CreateTime: time.Now(),
 	}
@@ -250,7 +254,7 @@ func (fifo *FIFOPolicy) OnAdd(key string, entry *core.CacheEntry) {
 }
 
 // OnRemove 移除时的回调
-func (fifo *FIFOPolicy) OnRemove(key string, entry *core.CacheEntry) {
+func (fifo *fifoPolicy) OnRemove(key string, entry *core.CacheEntry) {
 	fifo.mu.Lock()
 	defer fifo.mu.Unlock()
 

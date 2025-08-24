@@ -1,3 +1,4 @@
+
 package cache
 
 import (
@@ -24,22 +25,22 @@ type RemoteCacheConfig struct {
 // 为不同的远程缓存实现（Redis、Memcached等）提供统一接口
 type RemoteCache interface {
 	core.Cache
-	
+
 	// Connect 连接到远程缓存服务器
 	Connect(ctx context.Context) error
-	
+
 	// IsConnected 检查是否已连接
 	IsConnected() bool
-	
+
 	// Ping 检查连接状态
 	Ping(ctx context.Context) error
-	
+
 	// GetStats 获取远程缓存统计信息
 	GetStats(ctx context.Context) (map[string]interface{}, error)
 }
 
-// RemoteCacheBase 远程缓存基础实现
-type RemoteCacheBase struct {
+// remoteCacheBase 远程缓存基础实现
+type remoteCacheBase struct {
 	mu          sync.RWMutex
 	config      RemoteCacheConfig
 	stats       core.CacheStats
@@ -47,9 +48,9 @@ type RemoteCacheBase struct {
 	client      interface{} // 具体的客户端实现
 }
 
-// NewRemoteCacheBase 创建远程缓存基础实例
-func NewRemoteCacheBase(config RemoteCacheConfig) *RemoteCacheBase {
-	return &RemoteCacheBase{
+// newRemoteCacheBase 创建远程缓存基础实例
+func newRemoteCacheBase(config RemoteCacheConfig) *remoteCacheBase {
+	return &remoteCacheBase{
 		config: config,
 		stats: core.CacheStats{
 			MaxSize: config.MaxSize,
@@ -59,27 +60,27 @@ func NewRemoteCacheBase(config RemoteCacheConfig) *RemoteCacheBase {
 }
 
 // Get 从远程缓存获取数据（基础实现，需要具体实现重写）
-func (rc *RemoteCacheBase) Get(ctx context.Context, key string) (interface{}, error) {
-	return nil, core.NewTestKitError(core.ErrInternalError, "Get method not implemented")
+func (rc *remoteCacheBase) Get(ctx context.Context, key string) (interface{}, error) {
+	return nil, fmt.Errorf("Get method not implemented")
 }
 
 // Set 向远程缓存设置数据（基础实现，需要具体实现重写）
-func (rc *RemoteCacheBase) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
-	return core.NewTestKitError(core.ErrInternalError, "Set method not implemented")
+func (rc *remoteCacheBase) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
+	return fmt.Errorf("Set method not implemented")
 }
 
 // Delete 从远程缓存删除数据（基础实现，需要具体实现重写）
-func (rc *RemoteCacheBase) Delete(ctx context.Context, key string) error {
-	return core.NewTestKitError(core.ErrInternalError, "Delete method not implemented")
+func (rc *remoteCacheBase) Delete(ctx context.Context, key string) error {
+	return fmt.Errorf("Delete method not implemented")
 }
 
 // Clear 清空远程缓存（基础实现，需要具体实现重写）
-func (rc *RemoteCacheBase) Clear(ctx context.Context) error {
-	return core.NewTestKitError(core.ErrInternalError, "Clear method not implemented")
+func (rc *remoteCacheBase) Clear(ctx context.Context) error {
+	return fmt.Errorf("Clear method not implemented")
 }
 
 // Stats 获取缓存统计信息
-func (rc *RemoteCacheBase) Stats() core.CacheStats {
+func (rc *remoteCacheBase) Stats() core.CacheStats {
 	rc.mu.RLock()
 	defer rc.mu.RUnlock()
 
@@ -96,21 +97,21 @@ func (rc *RemoteCacheBase) Stats() core.CacheStats {
 }
 
 // IsConnected 检查是否已连接
-func (rc *RemoteCacheBase) IsConnected() bool {
+func (rc *remoteCacheBase) IsConnected() bool {
 	rc.mu.RLock()
 	defer rc.mu.RUnlock()
 	return rc.isConnected
 }
 
 // setConnected 设置连接状态
-func (rc *RemoteCacheBase) setConnected(connected bool) {
+func (rc *remoteCacheBase) setConnected(connected bool) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 	rc.isConnected = connected
 }
 
 // updateStats 更新统计信息
-func (rc *RemoteCacheBase) updateStats(hit bool) {
+func (rc *remoteCacheBase) updateStats(hit bool) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 
@@ -123,7 +124,7 @@ func (rc *RemoteCacheBase) updateStats(hit bool) {
 
 // MockRemoteCache 模拟远程缓存实现（用于测试和开发）
 type MockRemoteCache struct {
-	*RemoteCacheBase
+	*remoteCacheBase
 	data map[string]mockRemoteEntry
 }
 
@@ -135,7 +136,7 @@ type mockRemoteEntry struct {
 // NewMockRemoteCache 创建模拟远程缓存
 func NewMockRemoteCache(config RemoteCacheConfig) *MockRemoteCache {
 	return &MockRemoteCache{
-		RemoteCacheBase: NewRemoteCacheBase(config),
+		remoteCacheBase: newRemoteCacheBase(config),
 		data:            make(map[string]mockRemoteEntry),
 	}
 }
@@ -211,7 +212,7 @@ func (m *MockRemoteCache) Set(ctx context.Context, key string, value interface{}
 	if _, exists := m.data[key]; !exists {
 		m.stats.Size++
 	}
-	
+
 	m.data[key] = mockRemoteEntry{
 		value:      value,
 		expireTime: expireTime,

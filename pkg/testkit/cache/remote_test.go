@@ -1,4 +1,3 @@
-
 package cache
 
 import (
@@ -18,8 +17,8 @@ func newTestMockCache() (*MockRemoteCache, RemoteCacheConfig) {
 	return NewMockRemoteCache(cfg), cfg
 }
 
-func TestRemoteCacheBase_Stats(t *testing.T) {
-	base := NewRemoteCacheBase(RemoteCacheConfig{MaxSize: 100, DefaultTTL: time.Minute})
+func Test_remoteCacheBase_Stats(t *testing.T) {
+	base := newRemoteCacheBase(RemoteCacheConfig{MaxSize: 100, DefaultTTL: time.Minute})
 	base.stats.HitCount = 3
 	base.stats.MissCount = 1
 
@@ -32,33 +31,25 @@ func TestRemoteCacheBase_Stats(t *testing.T) {
 	assert.NotNil(t, stats.LastCleanup)
 }
 
-func TestRemoteCacheBase_NotImplemented(t *testing.T) {
-	base := NewRemoteCacheBase(RemoteCacheConfig{})
+func Test_remoteCacheBase_NotImplemented(t *testing.T) {
+	base := newRemoteCacheBase(RemoteCacheConfig{})
 	ctx := context.Background()
 
 	_, err := base.Get(ctx, "key")
 	assert.Error(t, err)
-	testKitErr, ok := err.(*core.TestKitError)
-	assert.True(t, ok)
-	assert.Equal(t, core.ErrInternalError, testKitErr.Code)
+	assert.Equal(t, "Get method not implemented", err.Error())
 
 	err = base.Set(ctx, "key", "value", 0)
 	assert.Error(t, err)
-	testKitErr, ok = err.(*core.TestKitError)
-	assert.True(t, ok)
-	assert.Equal(t, core.ErrInternalError, testKitErr.Code)
+	assert.Equal(t, "Set method not implemented", err.Error())
 
 	err = base.Delete(ctx, "key")
 	assert.Error(t, err)
-	testKitErr, ok = err.(*core.TestKitError)
-	assert.True(t, ok)
-	assert.Equal(t, core.ErrInternalError, testKitErr.Code)
+	assert.Equal(t, "Delete method not implemented", err.Error())
 
 	err = base.Clear(ctx)
 	assert.Error(t, err)
-	testKitErr, ok = err.(*core.TestKitError)
-	assert.True(t, ok)
-	assert.Equal(t, core.ErrInternalError, testKitErr.Code)
+	assert.Equal(t, "Clear method not implemented", err.Error())
 }
 
 func TestMockRemoteCache_ConnectAndPing(t *testing.T) {
