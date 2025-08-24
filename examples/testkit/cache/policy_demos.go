@@ -11,53 +11,70 @@ import (
 
 // lruDemo 演示LRU缓存策略
 func lruDemo(ctx context.Context) {
-	// 创建使用LRU策略的内存缓存(简化版本)
+	// 1. 配置缓存
 	memConfig := cache.MemoryCacheConfig{
-		MaxSize:         3, // 小容量便于观察淘汰效果
+		MaxSize:         3,
 		DefaultTTL:      5 * time.Minute,
 		CleanupInterval: 1 * time.Minute,
 	}
+	policyConfig := cache.PolicyConfig{
+		Type:    cache.PolicyLRU,
+		MaxSize: 3, // 关键：设置容量为3
+		TTL:     5 * time.Minute,
+	}
 
-	// 暂时使用普通内存缓存来演示基础操作
-	memCache := cache.NewMemoryCache(memConfig)
-	defer memCache.Close()
+	// 2. 创建使用LRU策略的智能缓存
+	smartCache := cache.NewSmartCache(memConfig, policyConfig)
+	defer smartCache.Close()
 
-	fmt.Printf("   创建基础缓存，容量=3 (策略演示)\n")
+	fmt.Printf("   创建LRU缓存，容量=3\n")
 
-	// 依次添加数据
+	// 3. 依次添加 A, B, C
 	items := []struct{ key, value string }{
 		{"A", "数据A"},
 		{"B", "数据B"},
 		{"C", "数据C"},
 	}
-
+	// 在函数作用域顶部声明err变量，避免作用域问题
+	var err error
 	for _, item := range items {
-		err := memCache.Set(ctx, item.key, item.value, 0)
+		// 使用 = 而不是 :=
+		err = smartCache.Set(ctx, item.key, item.value, 0)
 		if err != nil {
 			log.Printf("设置缓存失败: %v", err)
 			continue
 		}
 		fmt.Printf("   ✓ 添加: %s -> %s\n", item.key, item.value)
+		time.Sleep(10 * time.Millisecond) // 确保添加顺序
 	}
 
-	// 模拟LRU行为：访问A和B
-	memCache.Get(ctx, "A")
-	memCache.Get(ctx, "B")
-	fmt.Printf("   → 访问了A和B，模拟LRU行为\n")
+	// 4. 访问 A，使其变为最近使用的项
+	smartCache.Get(ctx, "A")
+	fmt.Printf("   → 访问 A，使其成为最近使用的项\n")
 
-	// 显示统计信息
-	stats := memCache.Stats()
-	fmt.Printf("   统计: 大小=%d, 命中=%d, 未命中=%d\n",
-		stats.Size, stats.HitCount, stats.MissCount)
+	// 5. 添加 D，此时容量已满(3)，应自动淘汰最久未使用的 B
+	err = smartCache.Set(ctx, "D", "数据D", 0)
+	if err != nil {
+		log.Printf("设置缓存失败: %v", err)
+	} else {
+		fmt.Printf("   ✓ 添加: D -> 数据D (应淘汰最久未使用的B)\n")
+	}
 
-	// 清理演示
-	memCache.Delete(ctx, "C")
-	fmt.Printf("   ✓ 模拟淘汰最久未访问的C\n")
+	// 6. 验证结果
+	// B 应该被淘汰
+	_, err = smartCache.Get(ctx, "B")
+	if err != nil {
+		fmt.Printf("   ✓ B 已被淘汰 (LRU策略生效)\n")
+	} else {
+		fmt.Printf("   ✗ B 仍然存在 (LRU策略未生效)\n")
+	}
 
-	// 验证A、B仍存在
-	for _, key := range []string{"A", "B"} {
-		if value, err := memCache.Get(ctx, key); err == nil {
-			fmt.Printf("   ✓ %s仍存在: %v\n", key, value)
+	// A, C, D 应该存在
+	for _, key := range []string{"A", "C", "D"} {
+		if val, err := smartCache.Get(ctx, key); err == nil {
+			fmt.Printf("   ✓ %s 仍存在: %v\n", key, val)
+		} else {
+			fmt.Printf("   ✗ %s 已被淘汰 (错误)\n", key)
 		}
 	}
 }

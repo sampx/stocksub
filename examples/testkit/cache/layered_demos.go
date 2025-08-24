@@ -226,3 +226,47 @@ func layeredStatsDemo(ctx context.Context) {
 	finalStats := layeredCache.Stats()
 	fmt.Printf("   预热后总大小: %d\n", finalStats.Size)
 }
+
+// batchOperationsDemo 批量操作演示
+func batchOperationsDemo(ctx context.Context) {
+	fmt.Printf("\n   === 批量操作演示 ===\n")
+	config := cache.DefaultLayeredCacheConfig()
+	layeredCache, err := cache.NewLayeredCache(config)
+	if err != nil {
+		log.Printf("创建分层缓存失败: %v", err)
+		return
+	}
+	defer layeredCache.Close()
+
+	// 准备批量数据
+	batchItems := map[string]interface{}{
+		"batch:001": "批量数据1",
+		"batch:002": "批量数据2",
+		"batch:003": "批量数据3",
+	}
+
+	// 批量设置
+	err = layeredCache.BatchSet(ctx, batchItems, 5*time.Minute)
+	if err != nil {
+		log.Printf("批量设置失败: %v", err)
+	} else {
+		fmt.Printf("   ✓ 成功批量设置 %d 条数据\n", len(batchItems))
+	}
+
+	// 批量获取
+	keys := []string{"batch:001", "batch:003", "batch:nonexistent"}
+	results, err := layeredCache.BatchGet(ctx, keys)
+	if err != nil {
+		log.Printf("批量获取失败: %v", err)
+	} else {
+		fmt.Printf("   ✓ 成功批量获取 %d 条数据:\n", len(results))
+		for key, value := range results {
+			fmt.Printf("     - %s -> %v\n", key, value)
+		}
+	}
+
+	// 验证未命中的键
+	if _, exists := results["batch:nonexistent"]; !exists {
+		fmt.Printf("   ✓ 验证批量获取未命中(预期行为): batch:nonexistent\n")
+	}
+}

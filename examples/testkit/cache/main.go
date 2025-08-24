@@ -90,6 +90,8 @@ func runLayeredDemo(ctx context.Context) {
 	writeModeDemo(ctx)
 	fmt.Println("\n4. 分层缓存统计演示")
 	layeredStatsDemo(ctx)
+	fmt.Println("\n5. 批量操作演示")
+	batchOperationsDemo(ctx)
 }
 
 // runAdvancedDemo 运行高级功能演示
@@ -111,11 +113,12 @@ func runAllDemos(ctx context.Context) {
 	runPolicyDemo(ctx)
 	runLayeredDemo(ctx)
 	runAdvancedDemo(ctx)
+	diskCacheDemo()
 }
 
 // ============= 基础缓存演示函数 =============
 
-// basicCacheDemo 展示基础的缓存操作
+// basicCacheDemo 展示内存 cache 的基础的缓存操作
 func basicCacheDemo(ctx context.Context) {
 	// 创建内存缓存配置
 	config := cache.MemoryCacheConfig{
@@ -174,7 +177,16 @@ func basicCacheDemo(ctx context.Context) {
 	}
 }
 
-// ttlCacheDemo 展示TTL(过期时间)功能
+// getKeysFromMap 从 map 中提取键的列表
+func getKeysFromMap(m map[string]bool) []string {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+// ttlCacheDemo 展示内存 cache TTL(过期时间)功能
 func ttlCacheDemo(ctx context.Context) {
 	config := cache.MemoryCacheConfig{
 		MaxSize:         100,
@@ -288,12 +300,55 @@ func cacheCleanupDemo(ctx context.Context) {
 	stats := memCache.Stats()
 	fmt.Printf("   填充后容量: %d/%d\n", stats.Size, stats.MaxSize)
 
+	// 记录添加新数据前的所有键
+	beforeKeys := make(map[string]bool)
+	for i := 0; i < 5; i++ {
+		key := fmt.Sprintf("stock:%d", i)
+		_, err := memCache.Get(ctx, key)
+		if err == nil {
+			beforeKeys[key] = true
+		}
+	}
+	fmt.Printf("   添加新数据前的键: %v\n", getKeysFromMap(beforeKeys))
+
 	// 继续添加数据，触发淘汰机制
 	err := memCache.Set(ctx, "stock:new", "新股票", 0)
 	if err != nil {
 		log.Printf("设置缓存失败: %v", err)
 	} else {
 		fmt.Printf("   ✓ 添加新数据，触发淘汰机制\n")
+	}
+
+	// 检查淘汰了哪个数据
+	afterKeys := make(map[string]bool)
+	for i := 0; i < 5; i++ {
+		key := fmt.Sprintf("stock:%d", i)
+		_, err := memCache.Get(ctx, key)
+		if err == nil {
+			afterKeys[key] = true
+		}
+	}
+	// 检查新添加的键
+	_, err = memCache.Get(ctx, "stock:new")
+	if err == nil {
+		afterKeys["stock:new"] = true
+	}
+
+	fmt.Printf("   添加新数据后的键: %v\n", getKeysFromMap(afterKeys))
+
+	// 找出被淘汰的键
+	evictedKey := ""
+	for key := range beforeKeys {
+		if !afterKeys[key] {
+			evictedKey = key
+			break
+		}
+	}
+
+	if evictedKey != "" {
+		fmt.Printf("   ✓ 淘汰的数据: %s (FIFO策略-最早添加的数据)\n", evictedKey)
+	} else {
+		fmt.Printf("   × 未检测到淘汰的数据\n")
 	}
 
 	stats = memCache.Stats()
