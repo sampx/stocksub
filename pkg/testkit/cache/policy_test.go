@@ -26,17 +26,15 @@ func TestLRUPolicy(t *testing.T) {
 	entries["3"] = entry3
 	policy.OnAdd("3", entry3)
 
-	// 访问 entry1, 模拟SmartCache行为，更新AccessTime
-	entry1.AccessTime = time.Now()
+	// 访问 entry1, 模拟SmartCache行为
 	policy.OnAccess("1", entry1)
 
-	// 淘汰时，应该淘汰 entry2 (最久未访问)
-	// 注意：当前的ShouldEvict实现是基于AccessTime的，所以我们需要确保entry2的AccessTime最早
-	entry2.AccessTime = entry2.CreateTime // 假设创建后未访问
-	entry3.AccessTime = entry3.CreateTime // 假设创建后未访问
+	// 访问 entry2
+	policy.OnAccess("2", entry2)
 
+	// 淘汰时，应该淘汰 entry3 (最近最少访问)
 	toEvict := policy.ShouldEvict(entries)
-	assert.Contains(t, toEvict, "2")
+	assert.Contains(t, toEvict, "3")
 }
 
 func TestLFUPolicy(t *testing.T) {

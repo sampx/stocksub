@@ -195,7 +195,7 @@ func (mc *MemoryCache) cleanup() {
 	}
 }
 
-// evictOldest 淘汰最旧的条目（简单FIFO策略）
+// evictOldest 淘汰创建时间最早的条目（基于创建时间的淘汰策略）
 func (mc *MemoryCache) evictOldest() {
 	var oldestKey string
 	var oldestTime time.Time

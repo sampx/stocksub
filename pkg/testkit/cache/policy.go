@@ -71,19 +71,10 @@ func (lru *LRUPolicy) ShouldEvict(entries map[string]*core.CacheEntry) []string 
 		return nil
 	}
 
-	// 简单实现：返回最近最少使用的键
-	var oldestKey string
-	var oldestTime time.Time
-
-	for key, entry := range entries {
-		if oldestKey == "" || entry.AccessTime.Before(oldestTime) {
-			oldestKey = key
-			oldestTime = entry.AccessTime
-		}
-	}
-
-	if oldestKey != "" {
-		return []string{oldestKey}
+	// 找到链表末尾的元素（最近最少使用的元素）
+	if elem := lru.lruList.Back(); elem != nil {
+		lruEntry := elem.Value.(*LRUEntry)
+		return []string{lruEntry.Key}
 	}
 
 	return nil

@@ -196,22 +196,12 @@ func (lc *LayeredCache) Get(ctx context.Context, key string) (interface{}, error
 
 // getLayerType 获取缓存层类型
 func (lc *LayeredCache) getLayerType(index int) string {
-	if index < 0 || index >= len(lc.layers) {
+	if index < 0 || index >= len(lc.config.Layers) {
 		return "unknown"
 	}
 	
-	// 通过反射或其他方式获取实际类型
-	// 这里简化处理，返回基本类型信息
-	switch lc.layers[index].(type) {
-	case *MemoryCache, *SmartCache:
-		return "memory"
-	case *DiskCache:
-		return "disk"
-	case interface{ IsConnected() bool }: // 检查是否是RemoteCache
-		return "remote"
-	default:
-		return "unknown"
-	}
+	// 从配置中获取层类型
+	return string(lc.config.Layers[index].Type)
 }
 
 // asyncPromoteToUpperLayers 异步将数据提升到上层缓存

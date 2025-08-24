@@ -160,7 +160,7 @@ func (dc *DiskCache) Set(ctx context.Context, key string, value interface{}, ttl
 
 	// 检查是否超过最大大小
 	if int64(len(dc.entries)) >= dc.config.MaxSize && dc.config.MaxSize > 0 {
-		// 简单策略：删除最旧的条目
+		// 基于访问时间的淘汰策略：删除最久未访问的条目
 		var oldestKey string
 		var oldestTime time.Time
 		for k, e := range dc.entries {

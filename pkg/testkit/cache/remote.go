@@ -60,22 +60,22 @@ func NewRemoteCacheBase(config RemoteCacheConfig) *RemoteCacheBase {
 
 // Get 从远程缓存获取数据（基础实现，需要具体实现重写）
 func (rc *RemoteCacheBase) Get(ctx context.Context, key string) (interface{}, error) {
-	return nil, fmt.Errorf("Get method not implemented")
+	return nil, core.NewTestKitError(core.ErrInternalError, "Get method not implemented")
 }
 
 // Set 向远程缓存设置数据（基础实现，需要具体实现重写）
 func (rc *RemoteCacheBase) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
-	return fmt.Errorf("Set method not implemented")
+	return core.NewTestKitError(core.ErrInternalError, "Set method not implemented")
 }
 
 // Delete 从远程缓存删除数据（基础实现，需要具体实现重写）
 func (rc *RemoteCacheBase) Delete(ctx context.Context, key string) error {
-	return fmt.Errorf("Delete method not implemented")
+	return core.NewTestKitError(core.ErrInternalError, "Delete method not implemented")
 }
 
 // Clear 清空远程缓存（基础实现，需要具体实现重写）
 func (rc *RemoteCacheBase) Clear(ctx context.Context) error {
-	return fmt.Errorf("Clear method not implemented")
+	return core.NewTestKitError(core.ErrInternalError, "Clear method not implemented")
 }
 
 // Stats 获取缓存统计信息

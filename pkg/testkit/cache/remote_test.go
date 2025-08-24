@@ -38,19 +38,27 @@ func TestRemoteCacheBase_NotImplemented(t *testing.T) {
 
 	_, err := base.Get(ctx, "key")
 	assert.Error(t, err)
-	assert.Equal(t, "Get method not implemented", err.Error())
+	testKitErr, ok := err.(*core.TestKitError)
+	assert.True(t, ok)
+	assert.Equal(t, core.ErrInternalError, testKitErr.Code)
 
 	err = base.Set(ctx, "key", "value", 0)
 	assert.Error(t, err)
-	assert.Equal(t, "Set method not implemented", err.Error())
+	testKitErr, ok = err.(*core.TestKitError)
+	assert.True(t, ok)
+	assert.Equal(t, core.ErrInternalError, testKitErr.Code)
 
 	err = base.Delete(ctx, "key")
 	assert.Error(t, err)
-	assert.Equal(t, "Delete method not implemented", err.Error())
+	testKitErr, ok = err.(*core.TestKitError)
+	assert.True(t, ok)
+	assert.Equal(t, core.ErrInternalError, testKitErr.Code)
 
 	err = base.Clear(ctx)
 	assert.Error(t, err)
-	assert.Equal(t, "Clear method not implemented", err.Error())
+	testKitErr, ok = err.(*core.TestKitError)
+	assert.True(t, ok)
+	assert.Equal(t, core.ErrInternalError, testKitErr.Code)
 }
 
 func TestMockRemoteCache_ConnectAndPing(t *testing.T) {
