@@ -297,6 +297,20 @@ func NewSmartCache(config MemoryCacheConfig, policyConfig PolicyConfig) *SmartCa
 
 // Set 重写Set方法，集成淘汰策略
 func (sc *SmartCache) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
+	if ttl <= 0 {
+		ttl = sc.defaultTTL
+	}
+
+	now := time.Now()
+	entry := &core.CacheEntry{
+		Value:      value,
+		ExpireTime: now.Add(ttl),
+		AccessTime: now,
+		CreateTime: now,
+		HitCount:   0,
+		Size:       estimateSize(value),
+	}
+
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 
@@ -304,23 +318,20 @@ func (sc *SmartCache) Set(ctx context.Context, key string, value interface{}, tt
 	if int64(len(sc.entries)) >= sc.maxSize {
 		toEvict := sc.policy.ShouldEvict(sc.entries)
 		for _, evictKey := range toEvict {
-			if entry, exists := sc.entries[evictKey]; exists {
-				sc.policy.OnRemove(evictKey, entry)
+			if existingEntry, exists := sc.entries[evictKey]; exists {
+				sc.policy.OnRemove(evictKey, existingEntry)
 				delete(sc.entries, evictKey)
 			}
 		}
 	}
 
-	// 调用基类方法
-	err := sc.MemoryCache.Set(ctx, key, value, ttl)
-	if err == nil {
-		// 通知策略新增了条目
-		if entry, exists := sc.entries[key]; exists {
-			sc.policy.OnAdd(key, entry)
-		}
-	}
+	// 直接设置条目，避免调用基类方法造成双重加锁
+	sc.entries[key] = entry
 
-	return err
+	// 通知策略新增了条目
+	sc.policy.OnAdd(key, entry)
+
+	return nil
 }
 
 // Get 重写Get方法，集成访问通知
