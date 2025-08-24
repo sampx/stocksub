@@ -156,3 +156,15 @@ type Cache interface {
 	// Stats 获取缓存的统计信息。
 	Stats() CacheStats
 }
+
+// BatchGetter 批量获取接口
+type BatchGetter interface {
+	// BatchGet 批量从缓存中获取多个值
+	BatchGet(ctx context.Context, keys []string) (map[string]any, error)
+}
+
+// BatchSetter 批量设置接口
+type BatchSetter interface {
+	// BatchSet 批量向缓存中设置多个值
+	BatchSet(ctx context.Context, items map[string]any, ttl time.Duration) error
+}

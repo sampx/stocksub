@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// 测试智能缓存基本操作
 func TestSmartCache_BasicOperations(t *testing.T) {
 	memConfig := MemoryCacheConfig{
 		MaxSize:         10,
@@ -36,6 +37,7 @@ func TestSmartCache_BasicOperations(t *testing.T) {
 	assert.Equal(t, "value1", value)
 }
 
+// 测试智能缓存LRU淘汰策略
 func TestSmartCache_LRUEviction(t *testing.T) {
 	memConfig := MemoryCacheConfig{
 		MaxSize:         10,
@@ -81,6 +83,7 @@ func TestSmartCache_LRUEviction(t *testing.T) {
 	assert.Equal(t, "dataB", valueB)
 }
 
+// 测试智能缓存LFU淘汰策略
 func TestSmartCache_LFUEviction(t *testing.T) {
 	memConfig := MemoryCacheConfig{
 		MaxSize:         10,
@@ -120,6 +123,7 @@ func TestSmartCache_LFUEviction(t *testing.T) {
 	assert.Error(t, err, "Z应该被淘汰（LFU策略）")
 }
 
+// 测试智能缓存FIFO淘汰策略
 func TestSmartCache_FIFOEviction(t *testing.T) {
 	memConfig := MemoryCacheConfig{
 		MaxSize:         10,
@@ -160,6 +164,7 @@ func TestSmartCache_FIFOEviction(t *testing.T) {
 	assert.Error(t, err, "First应该被淘汰（FIFO策略）")
 }
 
+// 测试智能缓存并发操作
 func TestSmartCache_ConcurrentOperations(t *testing.T) {
 	memConfig := MemoryCacheConfig{
 		MaxSize:         10,
@@ -211,4 +216,124 @@ func TestSmartCache_ConcurrentOperations(t *testing.T) {
 
 	// 如果能到达这里，说明没有死锁
 	t.Log("并发操作成功完成，无死锁")
+}
+
+// 测试各种缓存策略
+func TestSmartCache_Policies(t *testing.T) {
+	memConfig := MemoryCacheConfig{
+		MaxSize:         10,
+		DefaultTTL:      5 * time.Minute,
+		CleanupInterval: 1 * time.Minute,
+	}
+
+	ctx := context.Background()
+
+	// 测试LRU策略
+	policyConfig := PolicyConfig{
+		Type:    PolicyLRU,
+		MaxSize: 3,
+		TTL:     5 * time.Minute,
+	}
+
+	smartCache := NewSmartCache(memConfig, policyConfig)
+	defer smartCache.Close()
+
+	// 添加数据并测试LRU行为
+	smartCache.Set(ctx, "A", "dataA", 0)
+	smartCache.Set(ctx, "B", "dataB", 0)
+	smartCache.Set(ctx, "C", "dataC", 0)
+
+	// 访问A和B，使C成为最久未访问的
+	smartCache.Get(ctx, "A")
+	smartCache.Get(ctx, "B")
+
+	// 添加第4个条目，应该淘汰C
+	err := smartCache.Set(ctx, "D", "dataD", 0)
+	assert.NoError(t, err)
+
+	// 验证C被淘汰
+	_, err = smartCache.Get(ctx, "C")
+	assert.Error(t, err)
+
+	// 测试LFU策略
+	policyConfig.Type = PolicyLFU
+	smartCacheLFU := NewSmartCache(memConfig, policyConfig)
+	defer smartCacheLFU.Close()
+
+	smartCacheLFU.Set(ctx, "X", "dataX", 0)
+	smartCacheLFU.Set(ctx, "Y", "dataY", 0)
+	smartCacheLFU.Set(ctx, "Z", "dataZ", 0)
+
+	// 多次访问X和Y，让Z的访问频率最低
+	for i := 0; i < 3; i++ {
+		smartCacheLFU.Get(ctx, "X")
+		smartCacheLFU.Get(ctx, "Y")
+	}
+	smartCacheLFU.Get(ctx, "Z") // Z只访问1次
+
+	// 添加新数据，应该淘汰访问频率最低的Z
+	err = smartCacheLFU.Set(ctx, "W", "dataW", 0)
+	assert.NoError(t, err)
+
+	// 验证Z被淘汰
+	_, err = smartCacheLFU.Get(ctx, "Z")
+	assert.Error(t, err)
+
+	// 测试FIFO策略
+	policyConfig.Type = PolicyFIFO
+	smartCacheFIFO := NewSmartCache(memConfig, policyConfig)
+	defer smartCacheFIFO.Close()
+
+	smartCacheFIFO.Set(ctx, "First", "第一个", 0)
+	time.Sleep(10 * time.Millisecond)
+	smartCacheFIFO.Set(ctx, "Second", "第二个", 0)
+	time.Sleep(10 * time.Millisecond)
+	smartCacheFIFO.Set(ctx, "Third", "第三个", 0)
+
+	// 添加新数据，应该淘汰最先进入的First
+	time.Sleep(10 * time.Millisecond)
+	err = smartCacheFIFO.Set(ctx, "Fourth", "第四个", 0)
+	assert.NoError(t, err)
+
+	// 验证First被淘汰
+	_, err = smartCacheFIFO.Get(ctx, "First")
+	assert.Error(t, err)
+}
+
+// 测试策略配置
+func TestPolicyConfig(t *testing.T) {
+	// 测试LRU策略
+	policyConfig := PolicyConfig{
+		Type:    PolicyLRU,
+		MaxSize: 100,
+		TTL:     5 * time.Minute,
+	}
+
+	policy := NewEvictionPolicy(policyConfig.Type)
+	assert.IsType(t, &LRUPolicy{}, policy)
+
+	// 测试LFU策略
+	policyConfig.Type = PolicyLFU
+	policy = NewEvictionPolicy(policyConfig.Type)
+	assert.IsType(t, &LFUPolicy{}, policy)
+
+	// 测试FIFO策略
+	policyConfig.Type = PolicyFIFO
+	policy = NewEvictionPolicy(policyConfig.Type)
+	assert.IsType(t, &FIFOPolicy{}, policy)
+
+	// 测试默认策略
+	policyConfig.Type = "unknown"
+	policy = NewEvictionPolicy(policyConfig.Type)
+	assert.IsType(t, &LRUPolicy{}, policy) // 默认是LRU
+}
+
+// 测试FIFO策略的OnAccess方法
+func TestFIFOPolicy_OnAccess(t *testing.T) {
+	// FIFO策略的OnAccess方法应该是空实现
+	// 这个测试主要是为了提高代码覆盖率
+	// 在实际使用中，FIFO策略不关心访问事件
+	// 我们只需要确保这个方法存在且不会panic
+	fifo := NewFIFOPolicy()
+	fifo.OnAccess("test", nil)
 }
