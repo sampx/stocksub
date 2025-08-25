@@ -1,6 +1,6 @@
 //go:build integration
 
-package tests
+package providers_test
 
 import (
 	"context"
@@ -34,15 +34,15 @@ func TestCachedProvider_WithRealAPI(t *testing.T) {
 	defer provider.Close()
 
 	ctx := context.Background()
-	// 使用一个真实的、不太可能退市的股票代码
-	symbols := []string{"sh600519"} // 贵州茅台
+	// 使用一个真实的、不带前缀的股票代码
+	symbols := []string{"600519"} // 贵州茅台
 
 	// 3. 第一次调用，应该会触发真实API调用，并将结果存入缓存
 	t.Log("第一次调用 (缓存未命中，将调用真实API)...")
 	data1, err := provider.FetchData(ctx, symbols)
 	require.NoError(t, err, "第一次API调用不应失败")
 	require.Len(t, data1, 1, "第一次调用应返回1条数据")
-	assert.Equal(t, "sh600519", data1[0].Symbol)
+	assert.Equal(t, "600519", data1[0].Symbol, "返回的股票代码应为无前缀格式")
 	assert.NotEmpty(t, data1[0].Name, "股票名称不应为空")
 
 	// 4. 第二次调用，应该直接从缓存获取数据
@@ -50,7 +50,7 @@ func TestCachedProvider_WithRealAPI(t *testing.T) {
 	data2, err := provider.FetchData(ctx, symbols)
 	require.NoError(t, err, "第二次缓存获取不应失败")
 	require.Len(t, data2, 1, "第二次调用应返回1条数据")
-	assert.Equal(t, "sh600519", data2[0].Symbol)
+	assert.Equal(t, "600519", data2[0].Symbol, "从缓存返回的股票代码应为无前缀格式")
 
 	// 5. 验证数据一致性
 	assert.Equal(t, data1[0].Name, data2[0].Name, "两次获取的股票名称应一致")

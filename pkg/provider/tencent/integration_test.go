@@ -1,21 +1,21 @@
 //go:build integration
 
-package tests
+package tencent_test
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"stocksub/pkg/provider/tencent"
+	"stocksub/pkg/subscriber"
 )
 
-// TestTencentAPIFormat 验证腾讯API返回的数据格式是否符合预期
-func TestTencentAPIFormat(t *testing.T) {
-	// 使用一个有效的股票代码列表
-	symbols := []string{"sh600000", "sz000001", "sh601398"}
+// TestProvider_APIFormat 验证腾讯API返回的数据格式是否符合预期
+func TestProvider_APIFormat(t *testing.T) {
+	// 使用一个有效的、不带前缀的股票代码列表
+	symbols := []string{"600000", "000001", "601398"}
 
 	// 创建腾讯Provider实例
 	provider := tencent.NewProvider()
@@ -29,11 +29,22 @@ func TestTencentAPIFormat(t *testing.T) {
 	// 断言返回的数据量与请求的符号数量一致
 	require.Len(t, data, len(symbols), "返回的数据量应与请求的符号数量一致")
 
-	// 遍历返回的每一条数据，进行详细格式验证
+	// 将返回结果转换为 map 以便快速查找和验证
+	resultMap := make(map[string]subscriber.StockData, len(data))
 	for _, stock := range data {
-		t.Run("Stock_"+stock.Symbol, func(t *testing.T) {
-			assert.NotEmpty(t, stock.Symbol, "股票代码不应为空")
-			assert.True(t, strings.HasPrefix(stock.Symbol, "sh") || strings.HasPrefix(stock.Symbol, "sz"), "股票代码应包含sh或sz前缀")
+		resultMap[stock.Symbol] = stock
+	}
+
+	// 遍历请求的每一个股票代码，验证返回结果的准确性
+	for _, symbol := range symbols {
+		t.Run("Stock_"+symbol, func(t *testing.T) {
+			// 确认每个请求的股票都存在于返回结果中
+			stock, ok := resultMap[symbol]
+			require.True(t, ok, "结果中未找到股票: %s", symbol)
+
+			// 验证股票代码是正确的6位纯数字
+			assert.Equal(t, symbol, stock.Symbol, "股票代码应与请求的完全一致")
+			assert.Equal(t, 6, len(stock.Symbol), "股票代码长度应为6")
 
 			assert.NotEmpty(t, stock.Name, "股票名称不应为空")
 			assert.NotEqual(t, 0.0, stock.Price, "当前价格不应为0")

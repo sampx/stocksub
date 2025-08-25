@@ -1,6 +1,4 @@
-//go:build integration
-
-package tests
+package testkit_test
 
 import (
 	"context"

@@ -1,6 +1,6 @@
 //go:build integration
 
-package tests
+package storage_test
 
 import (
 	"context"
@@ -24,8 +24,9 @@ func TestAPIMonitor(t *testing.T) {
 	}
 
 	_, currentFile, _, _ := runtime.Caller(0)
-	testsDir := filepath.Dir(currentFile)
-	testDataDir := filepath.Join(testsDir, "data", "monitor_test")
+	// 调整路径以从 pkg/testkit/storage 指向 tests/data
+	projectRoot := filepath.Join(filepath.Dir(currentFile), "..", "..", "..")
+	testDataDir := filepath.Join(projectRoot, "_data", "monitor_test")
 
 	os.RemoveAll(testDataDir)
 	err := os.MkdirAll(testDataDir, 0755)
