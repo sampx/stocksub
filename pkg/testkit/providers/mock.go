@@ -97,6 +97,22 @@ func NewCallRecorder(maxSize int) *CallRecorder {
 	}
 }
 
+// Name returns the name of the provider.
+func (mp *MockProvider) Name() string {
+	return "mock"
+}
+
+// GetRateLimit returns the rate limit of the provider.
+func (mp *MockProvider) GetRateLimit() time.Duration {
+	return 200 * time.Millisecond // A sensible default
+}
+
+// IsSymbolSupported checks if a symbol is supported by the mock provider.
+func (mp *MockProvider) IsSymbolSupported(symbol string) bool {
+	// In mock provider, we can assume all symbols are supported.
+	return true
+}
+
 // FetchData 获取股票数据
 func (mp *MockProvider) FetchData(ctx context.Context, symbols []string) ([]subscriber.StockData, error) {
 	startTime := time.Now()

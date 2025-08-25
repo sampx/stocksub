@@ -13,6 +13,11 @@ import (
 	"stocksub/pkg/testkit/core"
 )
 
+// TestMockProvider_ImplementsSubscriberProvider ensures that MockProvider implements the subscriber.Provider interface.
+func TestMockProvider_ImplementsSubscriberProvider(t *testing.T) {
+	var _ subscriber.Provider = (*MockProvider)(nil)
+}
+
 func TestMockProvider_BasicOperations(t *testing.T) {
 	config := DefaultMockProviderConfig()
 	config.DefaultDelay = 10 * time.Millisecond

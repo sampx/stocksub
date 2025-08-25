@@ -15,11 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCSVStorage_StructuredData_Save(t *testing.T) {
-	// 创建临时目录
+// setupCSVStorageTest is a helper function to create a CSVStorage instance for testing.
+func setupCSVStorageTest(t *testing.T) (*CSVStorage, string) {
+	t.Helper()
 	tempDir := t.TempDir()
 
-	// 创建 CSVStorage 配置
 	config := CSVStorageConfig{
 		Directory:      tempDir,
 		FilePrefix:     "test",
@@ -28,14 +28,22 @@ func TestCSVStorage_StructuredData_Save(t *testing.T) {
 		RotateInterval: 24 * time.Hour,
 		EnableCompress: false,
 		BatchSize:      100,
-		FlushInterval:  0, // 禁用自动刷新
+		FlushInterval:  0, // Disable auto-flush for tests
 		ResourceConfig: helpers.DefaultResourceConfig(),
 	}
 
-	// 创建 CSVStorage 实例
 	storage, err := NewCSVStorage(config)
 	require.NoError(t, err)
-	defer storage.Close()
+
+	t.Cleanup(func() {
+		storage.Close()
+	})
+
+	return storage, tempDir
+}
+
+func TestCSVStorage_StructuredData_Save(t *testing.T) {
+	storage, tempDir := setupCSVStorageTest(t)
 
 	// 创建测试用的 StructuredData
 	// 使用上海时区的时间，这样转换后应该显示为 18:30
@@ -45,7 +53,7 @@ func TestCSVStorage_StructuredData_Save(t *testing.T) {
 	sd.Timestamp = testTime
 
 	// 设置测试数据
-	err = sd.SetField("symbol", "600000")
+	err := sd.SetField("symbol", "600000")
 	require.NoError(t, err)
 	err = sd.SetField("name", "浦发银行")
 	require.NoError(t, err)
