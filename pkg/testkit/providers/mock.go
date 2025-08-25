@@ -27,25 +27,25 @@ type MockProvider struct {
 
 // MockProviderConfig Mock Provider配置
 type MockProviderConfig struct {
-	EnableRecording   bool          `yaml:"enable_recording"`   // 是否启用调用记录
-	EnablePlayback    bool          `yaml:"enable_playback"`    // 是否启用回放
-	DefaultDelay      time.Duration `yaml:"default_delay"`      // 默认延迟
-	RandomDelay       bool          `yaml:"random_delay"`       // 是否使用随机延迟
-	MaxRandomDelay    time.Duration `yaml:"max_random_delay"`   // 最大随机延迟
-	EnableDataGen     bool          `yaml:"enable_data_gen"`    // 是否启用数据生成
-	DataGenConfig     DataGenConfig `yaml:"data_gen_config"`    // 数据生成配置
+	EnableRecording bool          `yaml:"enable_recording"` // 是否启用调用记录
+	EnablePlayback  bool          `yaml:"enable_playback"`  // 是否启用回放
+	DefaultDelay    time.Duration `yaml:"default_delay"`    // 默认延迟
+	RandomDelay     bool          `yaml:"random_delay"`     // 是否使用随机延迟
+	MaxRandomDelay  time.Duration `yaml:"max_random_delay"` // 最大随机延迟
+	EnableDataGen   bool          `yaml:"enable_data_gen"`  // 是否启用数据生成
+	DataGenConfig   DataGenConfig `yaml:"data_gen_config"`  // 数据生成配置
 }
 
 // MockProviderStats Mock Provider统计
 type MockProviderStats struct {
-	TotalCalls       int64     `json:"total_calls"`
-	SuccessfulCalls  int64     `json:"successful_calls"`
-	FailedCalls      int64     `json:"failed_calls"`
+	TotalCalls       int64         `json:"total_calls"`
+	SuccessfulCalls  int64         `json:"successful_calls"`
+	FailedCalls      int64         `json:"failed_calls"`
 	AverageDelay     time.Duration `json:"average_delay"`
-	LastCall         time.Time `json:"last_call"`
-	CurrentScenario  string    `json:"current_scenario"`
-	RecordingEnabled bool      `json:"recording_enabled"`
-	PlaybackEnabled  bool      `json:"playback_enabled"`
+	LastCall         time.Time     `json:"last_call"`
+	CurrentScenario  string        `json:"current_scenario"`
+	RecordingEnabled bool          `json:"recording_enabled"`
+	PlaybackEnabled  bool          `json:"playback_enabled"`
 }
 
 // CallRecorder 调用记录器
@@ -58,13 +58,13 @@ type CallRecorder struct {
 
 // CallRecord 调用记录
 type CallRecord struct {
-	ID         string                  `json:"id"`
-	Timestamp  time.Time               `json:"timestamp"`
-	Symbols    []string                `json:"symbols"`
-	Response   []subscriber.StockData  `json:"response"`
-	Error      error                   `json:"error"`
-	Duration   time.Duration           `json:"duration"`
-	Scenario   string                  `json:"scenario"`
+	ID        string                 `json:"id"`
+	Timestamp time.Time              `json:"timestamp"`
+	Symbols   []string               `json:"symbols"`
+	Response  []subscriber.StockData `json:"response"`
+	Error     error                  `json:"error"`
+	Duration  time.Duration          `json:"duration"`
+	Scenario  string                 `json:"scenario"`
 }
 
 // NewMockProvider 创建Mock Provider
@@ -77,14 +77,14 @@ func NewMockProvider(config MockProviderConfig) *MockProvider {
 		stats:     MockProviderStats{},
 		generator: NewDataGenerator(config.DataGenConfig),
 	}
-	
+
 	if config.EnableRecording {
 		mp.recorder = NewCallRecorder(1000) // 默认记录1000条调用
 	}
-	
+
 	// 加载默认场景
 	mp.loadDefaultScenarios()
-	
+
 	return mp
 }
 
@@ -102,18 +102,18 @@ func (mp *MockProvider) FetchData(ctx context.Context, symbols []string) ([]subs
 	startTime := time.Now()
 	atomic.AddInt64(&mp.stats.TotalCalls, 1)
 	mp.stats.LastCall = startTime
-	
+
 	// 应用延迟
 	if err := mp.applyDelay(); err != nil {
 		atomic.AddInt64(&mp.stats.FailedCalls, 1)
 		return nil, err
 	}
-	
+
 	mp.mu.RLock()
 	currentScene := mp.currentScene
 	scenarios := mp.scenarios
 	mp.mu.RUnlock()
-	
+
 	var result []subscriber.StockData
 	var err error
 
@@ -140,7 +140,7 @@ func (mp *MockProvider) FetchData(ctx context.Context, symbols []string) ([]subs
 
 end:
 	duration := time.Since(startTime)
-	
+
 	// 记录调用
 	if mp.recorder != nil && mp.recorder.enabled {
 		mp.recorder.RecordCall(CallRecord{
@@ -153,15 +153,15 @@ end:
 			Scenario:  currentScene,
 		})
 	}
-	
+
 	if err != nil {
 		atomic.AddInt64(&mp.stats.FailedCalls, 1)
 		return nil, err
 	}
-	
+
 	atomic.AddInt64(&mp.stats.SuccessfulCalls, 1)
 	mp.updateAverageDelay(duration)
-	
+
 	return result, nil
 }
 
@@ -169,7 +169,7 @@ end:
 func (mp *MockProvider) SetMockMode(enabled bool) {
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
-	
+
 	mp.enabled = enabled
 }
 
@@ -177,7 +177,7 @@ func (mp *MockProvider) SetMockMode(enabled bool) {
 func (mp *MockProvider) SetMockData(symbols []string, data []subscriber.StockData) {
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
-	
+
 	for i, symbol := range symbols {
 		if i < len(data) {
 			mp.mockData[symbol] = []subscriber.StockData{data[i]}
@@ -189,11 +189,11 @@ func (mp *MockProvider) SetMockData(symbols []string, data []subscriber.StockDat
 func (mp *MockProvider) SetScenario(scenarioName string) error {
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
-	
+
 	if _, exists := mp.scenarios[scenarioName]; !exists {
 		return fmt.Errorf("场景 %s 不存在", scenarioName)
 	}
-	
+
 	mp.currentScene = scenarioName
 	mp.stats.CurrentScenario = scenarioName
 	return nil
@@ -203,7 +203,7 @@ func (mp *MockProvider) SetScenario(scenarioName string) error {
 func (mp *MockProvider) AddScenario(scenario *core.MockScenario) {
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
-	
+
 	mp.scenarios[scenario.Name] = scenario
 }
 
@@ -211,7 +211,7 @@ func (mp *MockProvider) AddScenario(scenario *core.MockScenario) {
 func (mp *MockProvider) RemoveScenario(scenarioName string) {
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
-	
+
 	delete(mp.scenarios, scenarioName)
 	if mp.currentScene == scenarioName {
 		mp.currentScene = ""
@@ -222,7 +222,7 @@ func (mp *MockProvider) RemoveScenario(scenarioName string) {
 func (mp *MockProvider) GetScenarios() map[string]*core.MockScenario {
 	mp.mu.RLock()
 	defer mp.mu.RUnlock()
-	
+
 	result := make(map[string]*core.MockScenario)
 	for name, scenario := range mp.scenarios {
 		result[name] = scenario
@@ -234,11 +234,16 @@ func (mp *MockProvider) GetScenarios() map[string]*core.MockScenario {
 func (mp *MockProvider) Close() error {
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
-	
+
+	// 检查是否已经关闭
+	if !mp.enabled {
+		return fmt.Errorf("provider already closed")
+	}
+
 	mp.enabled = false
 	mp.scenarios = make(map[string]*core.MockScenario)
 	mp.mockData = make(map[string][]subscriber.StockData)
-	
+
 	return nil
 }
 
@@ -246,11 +251,11 @@ func (mp *MockProvider) Close() error {
 func (mp *MockProvider) GetStats() MockProviderStats {
 	mp.mu.RLock()
 	defer mp.mu.RUnlock()
-	
+
 	stats := mp.stats
 	stats.RecordingEnabled = mp.recorder != nil && mp.recorder.enabled
 	stats.PlaybackEnabled = mp.config.EnablePlayback
-	
+
 	return stats
 }
 
@@ -267,7 +272,7 @@ func (mp *MockProvider) executeScenario(symbols []string, scenario *core.MockSce
 			return nil, err
 		}
 	}
-	
+
 	// 应用场景延迟（支持通配符）
 	if delay, exists := scenario.Delays["*"]; exists && delay > 0 {
 		time.Sleep(delay)
@@ -278,7 +283,7 @@ func (mp *MockProvider) executeScenario(symbols []string, scenario *core.MockSce
 			}
 		}
 	}
-	
+
 	// 获取响应数据
 	result := make([]subscriber.StockData, 0, len(symbols))
 	for _, symbol := range symbols {
@@ -294,7 +299,7 @@ func (mp *MockProvider) executeScenario(symbols []string, scenario *core.MockSce
 			}
 		}
 	}
-	
+
 	return result, nil
 }
 
@@ -309,11 +314,11 @@ func (mp *MockProvider) getMockData(symbols []string) ([]subscriber.StockData, e
 	}
 
 	result := make([]subscriber.StockData, 0, len(symbols))
-	
+
 	for _, symbol := range symbols {
 		if data, exists := mp.mockData[symbol]; exists && len(data) > 0 {
 			result = append(result, data[0])
-		} 
+		}
 	}
 
 	// 只有当所有请求的symbols都在mockData中找到时，才认为成功
@@ -328,16 +333,16 @@ func (mp *MockProvider) getMockData(symbols []string) ([]subscriber.StockData, e
 // applyDelay 应用延迟
 func (mp *MockProvider) applyDelay() error {
 	delay := mp.config.DefaultDelay
-	
+
 	if mp.config.RandomDelay && mp.config.MaxRandomDelay > 0 {
 		randomDelay := time.Duration(rand.Int63n(int64(mp.config.MaxRandomDelay)))
 		delay += randomDelay
 	}
-	
+
 	if delay > 0 {
 		time.Sleep(delay)
 	}
-	
+
 	return nil
 }
 
@@ -361,7 +366,7 @@ func (mp *MockProvider) loadDefaultScenarios() {
 		Delays:      make(map[string]time.Duration),
 		Errors:      make(map[string]error),
 	}
-	
+
 	// 错误场景
 	errorScenario := &core.MockScenario{
 		Name:        "error",
@@ -372,7 +377,7 @@ func (mp *MockProvider) loadDefaultScenarios() {
 			"*": fmt.Errorf("API服务暂时不可用"),
 		},
 	}
-	
+
 	// 延迟场景
 	slowScenario := &core.MockScenario{
 		Name:        "slow",
@@ -383,11 +388,11 @@ func (mp *MockProvider) loadDefaultScenarios() {
 		},
 		Errors: make(map[string]error),
 	}
-	
+
 	mp.scenarios["normal"] = normalScenario
 	mp.scenarios["error"] = errorScenario
 	mp.scenarios["slow"] = slowScenario
-	
+
 	// 设置默认场景
 	mp.currentScene = "normal"
 }
@@ -396,16 +401,16 @@ func (mp *MockProvider) loadDefaultScenarios() {
 func (cr *CallRecorder) RecordCall(record CallRecord) {
 	cr.mu.Lock()
 	defer cr.mu.Unlock()
-	
+
 	if !cr.enabled {
 		return
 	}
-	
+
 	// 如果达到最大容量，移除最旧的记录
 	if len(cr.calls) >= cr.maxSize {
 		cr.calls = cr.calls[1:]
 	}
-	
+
 	cr.calls = append(cr.calls, record)
 }
 
@@ -413,7 +418,7 @@ func (cr *CallRecorder) RecordCall(record CallRecord) {
 func (cr *CallRecorder) GetCalls() []CallRecord {
 	cr.mu.RLock()
 	defer cr.mu.RUnlock()
-	
+
 	result := make([]CallRecord, len(cr.calls))
 	copy(result, cr.calls)
 	return result
@@ -423,7 +428,7 @@ func (cr *CallRecorder) GetCalls() []CallRecord {
 func (cr *CallRecorder) GetCallsBySymbol(symbol string) []CallRecord {
 	cr.mu.RLock()
 	defer cr.mu.RUnlock()
-	
+
 	result := make([]CallRecord, 0)
 	for _, call := range cr.calls {
 		for _, s := range call.Symbols {
@@ -440,7 +445,7 @@ func (cr *CallRecorder) GetCallsBySymbol(symbol string) []CallRecord {
 func (cr *CallRecorder) Clear() {
 	cr.mu.Lock()
 	defer cr.mu.Unlock()
-	
+
 	cr.calls = cr.calls[:0]
 }
 
@@ -448,7 +453,7 @@ func (cr *CallRecorder) Clear() {
 func (cr *CallRecorder) Enable() {
 	cr.mu.Lock()
 	defer cr.mu.Unlock()
-	
+
 	cr.enabled = true
 }
 
@@ -456,7 +461,7 @@ func (cr *CallRecorder) Enable() {
 func (cr *CallRecorder) Disable() {
 	cr.mu.Lock()
 	defer cr.mu.Unlock()
-	
+
 	cr.enabled = false
 }
 
@@ -468,12 +473,12 @@ type DataGenerator struct {
 
 // DataGenConfig 数据生成配置
 type DataGenConfig struct {
-	PriceRange       PriceRange `yaml:"price_range"`
-	VolumnRange      VolumeRange `yaml:"volume_range"`
-	ChangeRange      ChangeRange `yaml:"change_range"`
-	RandomSeed       int64       `yaml:"random_seed"`
-	EnableRealistic  bool        `yaml:"enable_realistic"` // 是否生成现实的数据
-	MarketHours      bool        `yaml:"market_hours"`     // 是否模拟市场时间
+	PriceRange      PriceRange  `yaml:"price_range"`
+	VolumnRange     VolumeRange `yaml:"volume_range"`
+	ChangeRange     ChangeRange `yaml:"change_range"`
+	RandomSeed      int64       `yaml:"random_seed"`
+	EnableRealistic bool        `yaml:"enable_realistic"` // 是否生成现实的数据
+	MarketHours     bool        `yaml:"market_hours"`     // 是否模拟市场时间
 }
 
 // PriceRange 价格范围
@@ -500,7 +505,7 @@ func NewDataGenerator(config DataGenConfig) *DataGenerator {
 	if seed == 0 {
 		seed = time.Now().UnixNano()
 	}
-	
+
 	return &DataGenerator{
 		config: config,
 		rand:   rand.New(rand.NewSource(seed)),
@@ -510,12 +515,12 @@ func NewDataGenerator(config DataGenConfig) *DataGenerator {
 // GenerateStockData 生成股票数据
 func (dg *DataGenerator) GenerateStockData(symbols []string) ([]subscriber.StockData, error) {
 	result := make([]subscriber.StockData, 0, len(symbols))
-	
+
 	for _, symbol := range symbols {
 		data := dg.generateSingleStock(symbol)
 		result = append(result, data)
 	}
-	
+
 	return result, nil
 }
 
@@ -525,10 +530,10 @@ func (dg *DataGenerator) generateSingleStock(symbol string) subscriber.StockData
 	price := dg.generatePrice()
 	change := dg.generateChange()
 	changePercent := (change / price) * 100
-	
+
 	// 生成其他字段
 	volume := dg.generateVolume()
-	
+
 	return subscriber.StockData{
 		Symbol:        symbol,
 		Name:          dg.generateStockName(symbol),
@@ -548,12 +553,12 @@ func (dg *DataGenerator) generateSingleStock(symbol string) subscriber.StockData
 func (dg *DataGenerator) generatePrice() float64 {
 	min := dg.config.PriceRange.Min
 	max := dg.config.PriceRange.Max
-	
+
 	if min == 0 && max == 0 {
 		min = 1.0
 		max = 100.0
 	}
-	
+
 	return min + dg.rand.Float64()*(max-min)
 }
 
@@ -561,12 +566,12 @@ func (dg *DataGenerator) generatePrice() float64 {
 func (dg *DataGenerator) generateChange() float64 {
 	min := dg.config.ChangeRange.Min
 	max := dg.config.ChangeRange.Max
-	
+
 	if min == 0 && max == 0 {
 		min = -10.0
 		max = 10.0
 	}
-	
+
 	return min + dg.rand.Float64()*(max-min)
 }
 
@@ -574,12 +579,12 @@ func (dg *DataGenerator) generateChange() float64 {
 func (dg *DataGenerator) generateVolume() int64 {
 	min := dg.config.VolumnRange.Min
 	max := dg.config.VolumnRange.Max
-	
+
 	if min == 0 && max == 0 {
 		min = 1000
 		max = 1000000
 	}
-	
+
 	return min + dg.rand.Int63n(max-min)
 }
 
@@ -588,10 +593,10 @@ func (dg *DataGenerator) generateStockName(symbol string) string {
 	// 简单的名称生成逻辑
 	prefixes := []string{"测试", "模拟", "样本", "示例"}
 	suffixes := []string{"科技", "控股", "实业", "集团", "股份"}
-	
+
 	prefix := prefixes[dg.rand.Intn(len(prefixes))]
 	suffix := suffixes[dg.rand.Intn(len(suffixes))]
-	
+
 	return fmt.Sprintf("%s%s%s", prefix, symbol, suffix)
 }
 

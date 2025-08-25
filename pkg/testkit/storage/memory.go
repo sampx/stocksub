@@ -4,9 +4,11 @@ package storage
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
+	"stocksub/pkg/subscriber"
 	"stocksub/pkg/testkit/core"
 )
 
@@ -140,8 +142,84 @@ func (ms *MemoryStorage) Close() error {
 	return nil
 }
 
+// BatchSave 批量保存数据到内存中（支持 StructuredData 优化）
+func (ms *MemoryStorage) BatchSave(ctx context.Context, dataList []interface{}) error {
+	if len(dataList) == 0 {
+		return nil
+	}
+
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+
+	// 按表名分组数据
+	tableGroups := make(map[string][]interface{})
+	for _, data := range dataList {
+		tableName := ms.getTableName(data)
+		tableGroups[tableName] = append(tableGroups[tableName], data)
+	}
+
+	// 为每个表批量处理数据
+	for tableName, tableData := range tableGroups {
+		if err := ms.batchSaveToTable(tableName, tableData); err != nil {
+			return fmt.Errorf("batch save to table %s failed: %w", tableName, err)
+		}
+	}
+
+	ms.stats.TotalRecords += int64(len(dataList))
+	return nil
+}
+
+// batchSaveToTable 批量保存数据到指定表中
+func (ms *MemoryStorage) batchSaveToTable(tableName string, tableData []interface{}) error {
+	// 确保表存在
+	if _, exists := ms.data[tableName]; !exists {
+		ms.data[tableName] = make([]interface{}, 0)
+	}
+
+	// 检查容量限制
+	currentSize := len(ms.data[tableName])
+	newDataSize := len(tableData)
+	totalSize := currentSize + newDataSize
+
+	// 如果总大小超过限制，移除旧数据
+	if totalSize > ms.config.MaxRecords {
+		excessCount := totalSize - ms.config.MaxRecords
+		if excessCount >= currentSize {
+			// 新数据太多，只保留最新的
+			ms.data[tableName] = ms.data[tableName][:0]
+			keepCount := ms.config.MaxRecords
+			if keepCount > newDataSize {
+				keepCount = newDataSize
+			}
+			tableData = tableData[newDataSize-keepCount:]
+		} else {
+			// 移除一些旧数据
+			ms.data[tableName] = ms.data[tableName][excessCount:]
+		}
+	}
+
+	// 批量添加数据并建立索引
+	startIndex := len(ms.data[tableName])
+	ms.data[tableName] = append(ms.data[tableName], tableData...)
+
+	// 为新添加的数据建立索引
+	if ms.config.EnableIndex {
+		for i, data := range tableData {
+			ms.updateIndex(tableName, data, startIndex+i)
+		}
+	}
+
+	return nil
+}
+
 func (ms *MemoryStorage) getTableName(data interface{}) string {
-	switch data.(type) {
+	switch d := data.(type) {
+	case *subscriber.StructuredData:
+		// 对于 StructuredData，使用 schema 名称作为表名
+		if d.Schema != nil {
+			return fmt.Sprintf("table_structured_%s", d.Schema.Name)
+		}
+		return "table_structured_unknown"
 	case map[string]interface{}:
 		if m, ok := data.(map[string]interface{}); ok {
 			if t, exists := m["type"]; exists {
@@ -155,6 +233,12 @@ func (ms *MemoryStorage) getTableName(data interface{}) string {
 }
 
 func (ms *MemoryStorage) matchesQuery(record interface{}, query core.Query) bool {
+	// 如果是 StructuredData，使用专门的查询逻辑
+	if structData, ok := record.(*subscriber.StructuredData); ok {
+		return ms.queryStructuredData(structData, query)
+	}
+
+	// 对于其他类型，返回 true（保持原有行为）
 	return true
 }
 
@@ -168,10 +252,21 @@ func (ms *MemoryStorage) updateIndex(tableName string, data interface{}, index i
 
 	idx := ms.indexes[tableName]
 
-	idx.timeIndex = append(idx.timeIndex, TimeRecord{
-		Index:     index,
-		Timestamp: time.Now(),
-	})
+	// 处理 StructuredData 的特殊索引
+	if structData, ok := data.(*subscriber.StructuredData); ok {
+		ms.indexStructuredData(idx, structData, index)
+		// 使用 StructuredData 的时间戳
+		idx.timeIndex = append(idx.timeIndex, TimeRecord{
+			Index:     index,
+			Timestamp: structData.Timestamp,
+		})
+	} else {
+		// 为非 StructuredData 使用当前时间
+		idx.timeIndex = append(idx.timeIndex, TimeRecord{
+			Index:     index,
+			Timestamp: time.Now(),
+		})
+	}
 }
 
 func (ms *MemoryStorage) startPeriodicCleanup() {
@@ -237,3 +332,147 @@ func DefaultMemoryStorageConfig() MemoryStorageConfig {
 
 // 确保 MemoryStorage 实现了 core.Storage 接口。
 var _ core.Storage = (*MemoryStorage)(nil)
+
+// indexStructuredData 为 StructuredData 建立字段索引
+func (ms *MemoryStorage) indexStructuredData(index *MemoryIndex, data *subscriber.StructuredData, recordIndex int) {
+	index.mu.Lock()
+	defer index.mu.Unlock()
+
+	// 为每个字段值建立索引
+	for fieldName, value := range data.Values {
+		if value == nil {
+			continue
+		}
+
+		// 生成索引键：字段名:值
+		indexKey := fmt.Sprintf("%s:%v", fieldName, value)
+		if _, exists := index.fieldIndex[indexKey]; !exists {
+			index.fieldIndex[indexKey] = make([]int, 0)
+		}
+		index.fieldIndex[indexKey] = append(index.fieldIndex[indexKey], recordIndex)
+
+		// 为字符串类型建立前缀索引
+		if strValue, ok := value.(string); ok {
+			// 建立前缀索引
+			for i := 1; i <= len(strValue) && i <= 10; i++ { // 限制前缀长度
+				prefixKey := fmt.Sprintf("%s:prefix:%s", fieldName, strValue[:i])
+				if _, exists := index.fieldIndex[prefixKey]; !exists {
+					index.fieldIndex[prefixKey] = make([]int, 0)
+				}
+				index.fieldIndex[prefixKey] = append(index.fieldIndex[prefixKey], recordIndex)
+			}
+		}
+	}
+
+	// 为 symbol 字段建立特殊索引（如果存在）
+	if symbol, exists := data.Values["symbol"]; exists {
+		if strSymbol, ok := symbol.(string); ok {
+			symbolKey := fmt.Sprintf("symbol_index:%s", strSymbol)
+			if _, exists := index.fieldIndex[symbolKey]; !exists {
+				index.fieldIndex[symbolKey] = make([]int, 0)
+			}
+			index.fieldIndex[symbolKey] = append(index.fieldIndex[symbolKey], recordIndex)
+		}
+	}
+}
+
+// queryStructuredData 查询 StructuredData 是否匹配给定的查询条件
+func (ms *MemoryStorage) queryStructuredData(data *subscriber.StructuredData, query core.Query) bool {
+	// 如果没有查询条件，匹配所有记录
+	if len(query.Symbols) == 0 && query.StartTime.IsZero() && query.EndTime.IsZero() {
+		return true
+	}
+
+	// 检查股票代码匹配
+	if len(query.Symbols) > 0 {
+		if symbol, exists := data.Values["symbol"]; exists {
+			if symbolStr, ok := symbol.(string); ok {
+				found := false
+				for _, targetSymbol := range query.Symbols {
+					if symbolStr == targetSymbol {
+						found = true
+						break
+					}
+				}
+				if !found {
+					return false
+				}
+			} else {
+				return false
+			}
+		} else {
+			return false
+		}
+	}
+
+	// 检查时间范围
+	if !query.StartTime.IsZero() && data.Timestamp.Before(query.StartTime) {
+		return false
+	}
+	if !query.EndTime.IsZero() && data.Timestamp.After(query.EndTime) {
+		return false
+	}
+
+	return true
+}
+
+// GetStats 返回 MemoryStorage 的统计信息
+func (ms *MemoryStorage) GetStats() MemoryStorageStats {
+	ms.mu.RLock()
+	defer ms.mu.RUnlock()
+
+	stats := ms.stats
+	stats.TotalTables = len(ms.data)
+	stats.IndexCount = len(ms.indexes)
+
+	return stats
+}
+
+// QueryBySymbol 根据股票代码查询 StructuredData（便捷方法）
+func (ms *MemoryStorage) QueryBySymbol(ctx context.Context, symbol string) ([]*subscriber.StructuredData, error) {
+	query := core.Query{
+		Symbols: []string{symbol},
+	}
+
+	results, err := ms.Load(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+
+	// 过滤出 StructuredData 类型的结果
+	var structuredResults []*subscriber.StructuredData
+	for _, result := range results {
+		if structData, ok := result.(*subscriber.StructuredData); ok {
+			structuredResults = append(structuredResults, structData)
+		}
+	}
+
+	return structuredResults, nil
+}
+
+// QueryByTimeRange 根据时间范围查询 StructuredData
+func (ms *MemoryStorage) QueryByTimeRange(ctx context.Context, startTime, endTime time.Time) ([]*subscriber.StructuredData, error) {
+	ms.mu.RLock()
+	defer ms.mu.RUnlock()
+
+	var results []*subscriber.StructuredData
+
+	// 遍历所有表中的 StructuredData
+	for tableName, records := range ms.data {
+		if !strings.HasPrefix(tableName, "table_structured_") {
+			continue
+		}
+
+		for _, record := range records {
+			if structData, ok := record.(*subscriber.StructuredData); ok {
+				// 检查时间范围
+				if (structData.Timestamp.Equal(startTime) || structData.Timestamp.After(startTime)) &&
+					(structData.Timestamp.Equal(endTime) || structData.Timestamp.Before(endTime)) {
+					results = append(results, structData)
+				}
+			}
+		}
+	}
+
+	return results, nil
+}

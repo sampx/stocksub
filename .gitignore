@@ -1,14 +1,11 @@
 .DS_Store
-
-docs/
-doc/learn/
-doc/plans/
-
-dist/
-tests/data/
 .vscode/settings.json
+
+doc/
+dist/
 build/
 _data/
+tests/data/
 
 # ai
 .claude/
@@ -17,4 +14,3 @@ _data/
 .kiro/
 CLAUDE.md
 QWEN.md
-GEMINI.md

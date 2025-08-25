@@ -29,7 +29,7 @@ type CSVStorage struct {
 
 // CSVStorageConfig 定义了 CSVStorage 的所有可配置选项。
 type CSVStorageConfig struct {
-	Directory      string                 `yaml:"directory"`      // CSV文件的存储目录。
+	Directory      string                 `yaml:"directory"`       // CSV文件的存储目录。
 	FilePrefix     string                 `yaml:"file_prefix"`     // CSV文件名的前缀。
 	DateFormat     string                 `yaml:"date_format"`     // 用于生成每日文件名的时间格式。
 	MaxFileSize    int64                  `yaml:"max_file_size"`   // 单个CSV文件的最大大小（字节）。
@@ -91,6 +91,16 @@ func (cs *CSVStorage) Save(ctx context.Context, data interface{}) error {
 		return fmt.Errorf("获取写入器失败: %w", err)
 	}
 
+	// 对于 StructuredData，检查是否需要写入表头
+	if strings.HasPrefix(record.Type, "structured_") {
+		if sd, ok := data.(*subscriber.StructuredData); ok {
+			if err := cs.ensureStructuredDataHeader(writer, record.Type, record.Date, sd.Schema); err != nil {
+				cs.stats.WriteErrors++
+				return fmt.Errorf("写入StructuredData表头失败: %w", err)
+			}
+		}
+	}
+
 	if err := writer.Write(record.Fields); err != nil {
 		cs.stats.WriteErrors++
 		return fmt.Errorf("写入记录失败: %w", err)
@@ -109,6 +119,7 @@ func (cs *CSVStorage) BatchSave(ctx context.Context, dataList []interface{}) err
 	}
 
 	groups := make(map[string][][]string)
+	structuredDataSchemas := make(map[string]*subscriber.DataSchema) // 存储每个组的schema
 
 	for _, data := range dataList {
 		record, err := cs.convertToRecord(data)
@@ -119,18 +130,39 @@ func (cs *CSVStorage) BatchSave(ctx context.Context, dataList []interface{}) err
 
 		key := fmt.Sprintf("%s_%s", record.Type, record.Date)
 		groups[key] = append(groups[key], record.Fields)
+
+		// 如果是 StructuredData，保存其 schema
+		if strings.HasPrefix(record.Type, "structured_") {
+			if sd, ok := data.(*subscriber.StructuredData); ok {
+				structuredDataSchemas[key] = sd.Schema
+			}
+		}
 	}
 
 	for key, records := range groups {
-		parts := strings.SplitN(key, "_", 2)
-		if len(parts) != 2 {
+		// 找到最后一个下划线，分割记录类型和日期
+		lastUnderscoreIndex := strings.LastIndex(key, "_")
+		if lastUnderscoreIndex == -1 {
 			continue
 		}
 
-		writer, err := cs.getOrCreateWriter(parts[0], parts[1])
+		recordType := key[:lastUnderscoreIndex]
+		date := key[lastUnderscoreIndex+1:]
+
+		writer, err := cs.getOrCreateWriter(recordType, date)
 		if err != nil {
 			cs.stats.WriteErrors++
 			continue
+		}
+
+		// 对于 StructuredData，确保表头已写入
+		if strings.HasPrefix(recordType, "structured_") {
+			if schema, exists := structuredDataSchemas[key]; exists {
+				if err := cs.ensureStructuredDataHeader(writer, recordType, date, schema); err != nil {
+					cs.stats.WriteErrors++
+					continue
+				}
+			}
 		}
 
 		if err := writer.WriteAll(records); err != nil {
@@ -208,9 +240,29 @@ func (cs *CSVStorage) convertToRecord(data interface{}) (*core.Record, error) {
 	}
 
 	switch v := data.(type) {
+	case *subscriber.StructuredData:
+		// 处理 StructuredData 类型
+		record.Type = "structured_" + v.Schema.Name
+		record.Timestamp = v.Timestamp
+		record.Date = v.Timestamp.Format(cs.config.DateFormat)
+
+		// 从 StructuredData 中获取 symbol
+		if symbolValue, err := v.GetField("symbol"); err == nil && symbolValue != nil {
+			if symbol, ok := symbolValue.(string); ok {
+				record.Symbol = symbol
+			}
+		}
+
+		// 直接生成CSV字段，不使用StructuredDataSerializer
+		fields := cs.generateStructuredDataCSVRecord(v)
+		record.Fields = fields
+		return record, nil
+
 	case subscriber.StockData:
 		record.Type = "stock_data"
 		record.Symbol = v.Symbol
+		record.Timestamp = v.Timestamp
+		record.Date = v.Timestamp.Format(cs.config.DateFormat)
 	case map[string]interface{}:
 		if recordType, ok := v["type"].(string); ok {
 			record.Type = recordType
@@ -269,10 +321,18 @@ func (cs *CSVStorage) getOrCreateWriter(recordType, date string) (*helpers.CSVWr
 	writer := helpers.NewCSVWriterWrapper(file, cs.resourceMgr)
 
 	if stat, err := file.Stat(); err == nil && stat.Size() == 0 {
-		headers := cs.getCSVHeaders(recordType)
-		if err := writer.Write(headers); err != nil {
-			writer.Close()
-			return nil, fmt.Errorf("写入头部失败: %w", err)
+		// 检查是否是 StructuredData 类型，需要特殊处理表头
+		if strings.HasPrefix(recordType, "structured_") {
+			// 对于 StructuredData，表头将在第一次写入数据时处理
+			// 这里不写入表头，因为我们需要 schema 信息
+		} else {
+			headers := cs.getCSVHeaders(recordType)
+			if len(headers) > 0 {
+				if err := writer.Write(headers); err != nil {
+					writer.Close()
+					return nil, fmt.Errorf("写入头部失败: %w", err)
+				}
+			}
 		}
 	}
 
@@ -282,6 +342,11 @@ func (cs *CSVStorage) getOrCreateWriter(recordType, date string) (*helpers.CSVWr
 
 // getCSVHeaders 返回所有CSV文件统一使用的表头。
 func (cs *CSVStorage) getCSVHeaders(recordType string) []string {
+	// 检查是否是 StructuredData 类型
+	if strings.HasPrefix(recordType, "structured_") {
+		// 对于 StructuredData，返回空切片，因为表头会在 writeStructuredDataHeader 中处理
+		return []string{}
+	}
 	return []string{"timestamp", "type", "symbol", "data"}
 }
 
@@ -331,6 +396,117 @@ func DefaultCSVStorageConfig() CSVStorageConfig {
 		FlushInterval:  10 * time.Second,
 		ResourceConfig: helpers.DefaultResourceConfig(),
 	}
+}
+
+// getStructuredDataCSVHeaders 生成带描述的 StructuredData CSV 表头
+func (cs *CSVStorage) getStructuredDataCSVHeaders(schema *subscriber.DataSchema) []string {
+	headers := make([]string, len(schema.FieldOrder))
+
+	for i, fieldName := range schema.FieldOrder {
+		fieldDef, exists := schema.Fields[fieldName]
+		if !exists {
+			headers[i] = fieldName
+			continue
+		}
+
+		// 格式：中文描述(英文字段名)
+		if fieldDef.Description != "" {
+			headers[i] = fmt.Sprintf("%s(%s)", fieldDef.Description, fieldName)
+		} else {
+			headers[i] = fieldName
+		}
+	}
+
+	return headers
+}
+
+// writeStructuredDataHeader 写入 StructuredData 的 CSV 表头
+func (cs *CSVStorage) writeStructuredDataHeader(writer *helpers.CSVWriterWrapper, schema *subscriber.DataSchema) error {
+	headers := cs.getStructuredDataCSVHeaders(schema)
+	return writer.Write(headers)
+}
+
+// ensureStructuredDataHeader 确保 StructuredData 文件有正确的表头
+func (cs *CSVStorage) ensureStructuredDataHeader(writer *helpers.CSVWriterWrapper, recordType, date string, schema *subscriber.DataSchema) error {
+	// 检查文件是否为空（需要写入表头）
+	filename := fmt.Sprintf("%s_%s_%s.csv", cs.config.FilePrefix, recordType, date)
+	filepath := filepath.Join(cs.config.Directory, filename)
+
+	if stat, err := os.Stat(filepath); err == nil && stat.Size() == 0 {
+		// 文件为空，需要写入表头
+		return cs.writeStructuredDataHeader(writer, schema)
+	}
+
+	return nil
+}
+
+// generateStructuredDataCSVRecord 生成 StructuredData 的 CSV 数据行
+func (cs *CSVStorage) generateStructuredDataCSVRecord(sd *subscriber.StructuredData) []string {
+	record := make([]string, len(sd.Schema.FieldOrder))
+
+	// 设置上海时区
+	shanghaiTZ, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		// 如果加载失败，使用 UTC+8
+		shanghaiTZ = time.FixedZone("CST", 8*3600)
+	}
+
+	for i, fieldName := range sd.Schema.FieldOrder {
+		value, err := sd.GetField(fieldName)
+		if err != nil || value == nil {
+			record[i] = ""
+			continue
+		}
+
+		fieldDef := sd.Schema.Fields[fieldName]
+		record[i] = cs.formatStructuredDataValue(value, fieldDef.Type, shanghaiTZ)
+	}
+
+	return record
+}
+
+// formatStructuredDataValue 格式化 StructuredData 字段值
+func (cs *CSVStorage) formatStructuredDataValue(value interface{}, fieldType subscriber.FieldType, timezone *time.Location) string {
+	if value == nil {
+		return ""
+	}
+
+	switch fieldType {
+	case subscriber.FieldTypeString:
+		if str, ok := value.(string); ok {
+			return str
+		}
+	case subscriber.FieldTypeInt:
+		switch v := value.(type) {
+		case int:
+			return fmt.Sprintf("%d", v)
+		case int32:
+			return fmt.Sprintf("%d", v)
+		case int64:
+			return fmt.Sprintf("%d", v)
+		}
+	case subscriber.FieldTypeFloat64:
+		switch v := value.(type) {
+		case float32:
+			return fmt.Sprintf("%.2f", v)
+		case float64:
+			return fmt.Sprintf("%.2f", v)
+		}
+	case subscriber.FieldTypeBool:
+		if b, ok := value.(bool); ok {
+			if b {
+				return "true"
+			}
+			return "false"
+		}
+	case subscriber.FieldTypeTime:
+		if t, ok := value.(time.Time); ok {
+			// 使用上海时区格式化时间：YYYY-MM-DD HH:mm:ss
+			return t.In(timezone).Format("2006-01-02 15:04:05")
+		}
+	}
+
+	return fmt.Sprintf("%v", value)
 }
 
 // 确保 CSVStorage 实现了 core.Storage 接口。

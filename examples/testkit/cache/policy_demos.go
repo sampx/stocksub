@@ -211,12 +211,12 @@ func policyComparisonDemo(ctx context.Context) {
 
 	for _, p := range policies {
 		fmt.Printf("\n   --- %s策略 ---\n", p.name)
-		testPolicy(ctx, p.policy, p.name)
+		testPolicy(ctx, p.policy)
 	}
 }
 
 // testPolicy 测试特定策略的行为
-func testPolicy(ctx context.Context, policyType cache.PolicyType, name string) {
+func testPolicy(ctx context.Context, policyType cache.PolicyType) {
 	memConfig := cache.MemoryCacheConfig{
 		MaxSize:         2, // 非常小的容量
 		DefaultTTL:      5 * time.Minute,
