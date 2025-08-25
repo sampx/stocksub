@@ -13,7 +13,7 @@ import (
 )
 
 // TestProvider_APIFormat 验证腾讯API返回的数据格式是否符合预期
-func TestProvider_APIFormat(t *testing.T) {
+func TestProvider_APIFormat_ValidResponse(t *testing.T) {
 	// 使用一个有效的、不带前缀的股票代码列表
 	symbols := []string{"600000", "000001", "601398"}
 

@@ -13,7 +13,7 @@ import (
 )
 
 // BenchmarkTestDataManager 基准测试TestDataManager的性能
-func BenchmarkTestDataManager(b *testing.B) {
+func BenchmarkTestDataManager_GetStockData_VariousSizes(b *testing.B) {
 	cfg := &config.Config{
 		Cache:   config.CacheConfig{Type: "memory"},
 		Storage: config.StorageConfig{Type: "csv", Directory: b.TempDir()},
@@ -69,7 +69,7 @@ func BenchmarkTestDataManager(b *testing.B) {
 }
 
 // BenchmarkCSVStorage 基准测试CSV存储性能
-func BenchmarkCSVStorage(b *testing.B) {
+func BenchmarkCSVStorage_WriteOperations_SingleAndBatch(b *testing.B) {
 	cfg := storage.DefaultCSVStorageConfig()
 	cfg.Directory = b.TempDir()
 
@@ -117,7 +117,7 @@ func BenchmarkCSVStorage(b *testing.B) {
 }
 
 // BenchmarkMemoryUsage 内存使用基准测试
-func BenchmarkMemoryUsage(b *testing.B) {
+func BenchmarkTestDataManager_GetStockData_MemoryUsage(b *testing.B) {
 	b.Run("Manager_MemoryUsage", func(b *testing.B) {
 		cfg := &config.Config{
 			Cache:   config.CacheConfig{Type: "memory"},
@@ -150,7 +150,7 @@ func BenchmarkMemoryUsage(b *testing.B) {
 }
 
 // BenchmarkConcurrency 并发性能基准测试
-func BenchmarkConcurrency(b *testing.B) {
+func BenchmarkManagerAndStorage_Concurrency_ReadAndWrite(b *testing.B) {
 	b.Run("Concurrent_Read_Manager", func(b *testing.B) {
 		cfg := &config.Config{
 			Cache:   config.CacheConfig{Type: "memory"},

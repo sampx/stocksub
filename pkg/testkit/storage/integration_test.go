@@ -18,7 +18,7 @@ import (
 )
 
 // TestAPIMonitor 测试API监控器的完整功能
-func TestAPIMonitor(t *testing.T) {
+func TestCSVStorage_SaveAndRead_Successful(t *testing.T) {
 	if testing.Short() {
 		t.Skip("跳过API监控器测试")
 	}

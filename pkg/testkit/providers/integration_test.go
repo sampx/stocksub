@@ -15,7 +15,7 @@ import (
 
 // TestCachedProvider_WithRealAPI 是一个集成测试，用于验证CachedProvider与真实API的交互。
 // 这个测试会发起真实的外部网络请求，并且只在提供了 'integration' 构建标签时运行。
-func TestCachedProvider_WithRealAPI(t *testing.T) {
+func TestCachedProvider_Fetch_CacheHitAndMiss(t *testing.T) {
 	// 1. 创建依赖项：一个内存缓存和一个Provider工厂
 	memConfig := cache.MemoryCacheConfig{
 		MaxSize:         100,
