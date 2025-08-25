@@ -165,6 +165,25 @@ config.Logger.Filename = "app.log"  // 日志文件名
 
 ## 🔧 命令行工具
 
+### 测试
+
+```bash
+# 运行所有单元测试
+go test -v ./pkg/...
+
+# 运行所有集成测试
+go test -v -tags=integration ./pkg/...
+
+# 运行特定包的集成测试
+go test -v -tags=integration ./pkg/provider/tencent/
+
+# 运行系统级测试
+go test -v -tags=integration ./tests/
+
+# 运行性能基准测试
+go test -v -bench=. -benchmem ./pkg/testkit/
+```
+
 ### 构建
 
 ```bash
