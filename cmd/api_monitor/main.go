@@ -219,14 +219,40 @@ func (m *APIMonitor) Run(ctx context.Context) error {
 		// 检查是否可以继续进行API调用
 		shouldProceed, err := m.intelligentLimiter.ShouldProceed(ctx)
 		if err != nil {
-			m.logger.Printf("智能限制器终止: %v", err)
-			// 安全终止：不是错误，而是正常的安全停止
-			break
+			// 检查是否是市场时间相关的错误
+			if strings.Contains(err.Error(), "交易时段") || strings.Contains(err.Error(), "交易时间") {
+				m.logger.Printf("非交易时间，等待交易开始: %v", err)
+				fmt.Printf("当前非交易时间，等待交易开始...\n")
+				
+				// 等待到下一个交易时间开始
+				if waitErr := m.waitForTradingTime(ctx); waitErr != nil {
+					m.logger.Printf("等待交易时间期间收到取消信号: %v", waitErr)
+					return waitErr
+				}
+				
+				// 交易时间开始，重新初始化智能限制器
+				m.logger.Printf("交易时间开始，恢复监控")
+				fmt.Printf("交易时间开始，恢复监控...\n")
+				m.intelligentLimiter.InitializeBatch(m.config.Symbols)
+				continue
+			} else {
+				// 其他致命错误，终止监控
+				m.logger.Printf("智能限制器致命错误，终止: %v", err)
+				break
+			}
 		}
 
 		if !shouldProceed {
-			m.logger.Printf("智能限制器指示不可继续，安全停止")
-			break
+			m.logger.Printf("智能限制器指示暂停，等待后重试")
+			// 等待一段时间后重试，而不是直接退出
+			select {
+			case <-time.After(30 * time.Second):
+				// 等待30秒后重新检查
+				continue
+			case <-ctx.Done():
+				m.logger.Printf("等待期间收到取消信号")
+				return nil
+			}
 		}
 
 		iterationStart := time.Now()
@@ -452,6 +478,28 @@ func (m *APIMonitor) generateAnalysisReport(startTime time.Time, duration time.D
 	}
 
 	return err
+}
+
+// waitForTradingTime 等待直到交易时间开始
+func (m *APIMonitor) waitForTradingTime(ctx context.Context) error {
+	// 每分钟检查一次是否到了交易时间
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			if m.marketTime.IsTradingTime() {
+				return nil // 交易时间开始，可以返回
+			}
+			// 输出等待状态
+			currentTime := time.Now().Format("15:04:05")
+			fmt.Printf("[%s] 等待交易时间开始...\n", currentTime)
+			m.logger.Printf("等待交易时间开始，当前时间: %s", currentTime)
+		}
+	}
 }
 
 // Stop 停止监控
