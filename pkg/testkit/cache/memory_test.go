@@ -3,7 +3,7 @@ package cache
 
 import (
 	"context"
-	"fmt"
+	
 	"stocksub/pkg/testkit/core"
 	"testing"
 	"time"
@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// 测试MemoryCache基本操作
-func TestMemoryCache_BasicOperations(t *testing.T) {
+// TestMemoryCache_SetAndGet_WithValidData_ReturnsCorrectValue 测试MemoryCache基本操作
+func TestMemoryCache_SetAndGet_WithValidData_ReturnsCorrectValue(t *testing.T) {
 	config := MemoryCacheConfig{
 		MaxSize:         100,
 		DefaultTTL:      5 * time.Minute,
@@ -49,8 +49,8 @@ func TestMemoryCache_BasicOperations(t *testing.T) {
 	assert.Equal(t, core.ErrCacheMiss, testKitErr.Code)
 }
 
-// TestMemoryCache_TTL 测试MemoryCache的TTL功能，并验证过期条目在Get时被删除
-func TestMemoryCache_TTL(t *testing.T) {
+// TestMemoryCache_SetAndGet_WithExpiredEntry_DeletesEntryOnGet 测试MemoryCache的TTL功能，并验证过期条目在Get时被删除
+func TestMemoryCache_SetAndGet_WithExpiredEntry_DeletesEntryOnGet(t *testing.T) {
 	config := MemoryCacheConfig{
 		MaxSize:         100,
 		DefaultTTL:      100 * time.Millisecond,
@@ -87,8 +87,8 @@ func TestMemoryCache_TTL(t *testing.T) {
 	assert.Equal(t, int64(0), cache.Stats().Size)
 }
 
-// 测试MemoryCache统计信息
-func TestMemoryCache_Stats(t *testing.T) {
+// TestMemoryCache_Stats_WithOperations_ReturnsCorrectStatistics 测试MemoryCache统计信息
+func TestMemoryCache_Stats_WithOperations_ReturnsCorrectStatistics(t *testing.T) {
 	config := MemoryCacheConfig{
 		MaxSize:         100,
 		DefaultTTL:      5 * time.Minute,
@@ -123,8 +123,8 @@ func TestMemoryCache_Stats(t *testing.T) {
 	assert.Equal(t, 0.5, stats.HitRate)
 }
 
-// 测试MemoryCache清空功能
-func TestMemoryCache_Clear(t *testing.T) {
+// TestMemoryCache_Clear_WithData_RemovesAllEntries 测试MemoryCache清空功能
+func TestMemoryCache_Clear_WithData_RemovesAllEntries(t *testing.T) {
 	config := MemoryCacheConfig{
 		MaxSize:         100,
 		DefaultTTL:      5 * time.Minute,
@@ -160,8 +160,8 @@ func TestMemoryCache_Clear(t *testing.T) {
 	assert.Equal(t, core.ErrCacheMiss, testKitErr.Code)
 }
 
-// 测试MemoryCache的evictOldest方法
-func TestMemoryCache_EvictOldest(t *testing.T) {
+// TestMemoryCache_Set_WithMaxSize_EvictsOldestEntry 测试MemoryCache的evictOldest方法
+func TestMemoryCache_Set_WithMaxSize_EvictsOldestEntry(t *testing.T) {
 	config := MemoryCacheConfig{
 		MaxSize:         3, // 小容量以触发淘汰
 		DefaultTTL:      5 * time.Minute,
@@ -201,63 +201,18 @@ func TestMemoryCache_EvictOldest(t *testing.T) {
 	assert.Equal(t, core.ErrCacheMiss, testKitErr.Code)
 }
 
-// 测试estimateSize函数的所有分支
-func TestEstimateSize(t *testing.T) {
+// TestMemoryCache_EstimateSize_WithVariousTypes_ReturnsCorrectSize 测试estimateSize函数的所有分支
+func TestMemoryCache_EstimateSize_WithVariousTypes_ReturnsCorrectSize(t *testing.T) {
 	assert.Equal(t, int64(5), estimateSize("hello"))
 	assert.Equal(t, int64(10), estimateSize([]byte("0123456789")))
 	assert.Equal(t, int64(64), estimateSize(12345)) // default case
 	assert.Equal(t, int64(64), estimateSize(struct{}{})) // default case
 }
 
-// MemoryCache基准测试
-func BenchmarkMemoryCache_Set(b *testing.B) {
-	config := MemoryCacheConfig{
-		MaxSize:         10000,
-		DefaultTTL:      5 * time.Minute,
-		CleanupInterval: 1 * time.Minute,
-	}
 
-	cache := NewMemoryCache(config)
-	defer cache.Close()
 
-	ctx := context.Background()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		key := fmt.Sprintf("key%d", i)
-		value := fmt.Sprintf("value%d", i)
-		cache.Set(ctx, key, value, 0)
-	}
-}
-
-func BenchmarkMemoryCache_Get(b *testing.B) {
-	config := MemoryCacheConfig{
-		MaxSize:         10000,
-		DefaultTTL:      5 * time.Minute,
-		CleanupInterval: 1 * time.Minute,
-	}
-
-	cache := NewMemoryCache(config)
-	defer cache.Close()
-
-	ctx := context.Background()
-
-	// 预填充数据
-	for i := 0; i < 1000; i++ {
-		key := fmt.Sprintf("key%d", i)
-		value := fmt.Sprintf("value%d", i)
-		cache.Set(ctx, key, value, 0)
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		key := fmt.Sprintf("key%d", i%1000)
-		cache.Get(ctx, key)
-	}
-}
-
-// 测试MemoryCache的cleanup方法
-func TestMemoryCache_Cleanup(t *testing.T) {
+// TestMemoryCache_Cleanup_WithExpiredEntries_RemovesExpiredItems 测试MemoryCache的cleanup方法
+func TestMemoryCache_Cleanup_WithExpiredEntries_RemovesExpiredItems(t *testing.T) {
 	config := MemoryCacheConfig{
 		MaxSize:         100,
 		DefaultTTL:      50 * time.Millisecond,

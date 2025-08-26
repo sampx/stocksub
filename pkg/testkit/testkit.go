@@ -5,7 +5,7 @@ package testkit
 import (
 	"context"
 	"fmt"
-	"os"
+	
 	"sync"
 	"time"
 
@@ -24,7 +24,6 @@ type testDataManager struct {
 	cache        core.Cache
 	storage      core.Storage
 	provider     core.Provider
-	mockMode     bool
 	cacheEnabled bool
 	sessionID    string
 	stats        *enhancedStats
@@ -106,7 +105,6 @@ func NewTestDataManager(cfg *config.Config) core.TestDataManager {
 		cache:        cacheLayer,
 		storage:      storageLayer,
 		provider:     providerLayer,
-		mockMode:     false,
 		cacheEnabled: true,
 		sessionID:    generateSessionID(),
 		stats:        &enhancedStats{lastActivity: time.Now()},
@@ -122,35 +120,33 @@ func (tdm *testDataManager) GetStockData(ctx context.Context, symbols []string) 
 		tdm.stats.mutex.Unlock()
 	}()
 
-	// 如果是Mock模式，直接使用Provider的Mock功能
-	if tdm.mockMode {
-		tdm.stats.mutex.Lock()
-		tdm.stats.mockCalls++
-		tdm.stats.mutex.Unlock()
-		fmt.Printf("🎭 使用Mock模式，股票: %v\n", symbols)
-		return tdm.provider.FetchData(ctx, symbols)
-	}
-
-	// 检查是否强制使用缓存
-	if os.Getenv("TEST_FORCE_CACHE") == "1" {
-		cacheKey := tdm.generateCacheKey(symbols)
-		if cached, err := tdm.cache.Get(ctx, cacheKey); err == nil {
+	// 1. 检查顶层缓存
+	cacheKey := tdm.generateCacheKey(symbols)
+	if tdm.cacheEnabled {
+		if cachedData, err := tdm.cache.Get(ctx, cacheKey); err == nil {
 			tdm.updateCacheHit()
-			fmt.Printf("🎯 强制缓存模式命中，股票: %v\n", symbols)
-			return cached.([]subscriber.StockData), nil
+			fmt.Printf("🎯 TestDataManager 缓存命中，股票: %v\n", symbols)
+			return cachedData.([]subscriber.StockData), nil
 		}
-		return nil, core.NewTestKitError(core.ErrCacheMiss, "强制缓存模式，但未找到有效缓存数据")
 	}
 
-	// 从Provider获取数据（Provider内部会处理缓存）
+	// 2. 缓存未命中，通过Provider获取
+	tdm.updateCacheMiss()
 	fmt.Printf("📡 通过Provider获取数据，股票: %v\n", symbols)
 	data, err := tdm.provider.FetchData(ctx, symbols)
 	if err != nil {
 		return nil, core.WrapError(core.ErrProviderError, "获取数据失败", err)
 	}
 
-	// 异步保存到存储层
+	// 3. 获取成功后，异步更新缓存和存储
 	go func() {
+		// 更新顶层缓存
+		if tdm.cacheEnabled {
+			if err := tdm.cache.Set(ctx, cacheKey, data, tdm.config.Cache.TTL); err != nil {
+				fmt.Printf("⚠️ 顶层缓存存储失败: %v\n", err)
+			}
+		}
+		// 保存到存储层
 		if err := tdm.saveToStorage(context.Background(), data); err != nil {
 			fmt.Printf("⚠️ 存储数据失败: %v\n", err)
 		}
@@ -183,10 +179,6 @@ func (tdm *testDataManager) EnableCache(enabled bool) {
 
 // EnableMock 实现了 core.TestDataManager 接口的 EnableMock 方法。
 func (tdm *testDataManager) EnableMock(enabled bool) {
-	tdm.mu.Lock()
-	defer tdm.mu.Unlock()
-
-	tdm.mockMode = enabled
 	tdm.provider.SetMockMode(enabled)
 }
 
@@ -224,7 +216,7 @@ func (tdm *testDataManager) GetStats() core.Stats {
 		CacheSize:   cacheStats.Size,
 		TTL:         tdm.config.Cache.TTL,
 		Directory:   tdm.config.Storage.Directory,
-		MockMode:    tdm.mockMode,
+		
 		CacheHits:   tdm.stats.cacheHits + cacheStats.HitCount,
 		CacheMisses: tdm.stats.cacheMisses + cacheStats.MissCount,
 	}
@@ -302,7 +294,6 @@ func (tdm *testDataManager) GetAdvancedStats() map[string]interface{} {
 	return map[string]interface{}{
 		"session_id":        tdm.sessionID,
 		"cache_enabled":     tdm.cacheEnabled,
-		"mock_mode":         tdm.mockMode,
 		"cache_stats":       cacheStats,
 		"api_calls":         tdm.stats.apiCalls,
 		"storage_writes":    tdm.stats.storageWrites,

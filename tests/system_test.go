@@ -15,7 +15,7 @@ import (
 	"stocksub/pkg/testkit/config"
 	"syscall"
 	"testing"
-	time "time"
+	"time"
 )
 
 // TimeFieldAnalysis 时间字段分析结果
@@ -28,8 +28,8 @@ type TimeFieldAnalysis struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// TestTimeFieldConsistencyLongRun 长时间运行的时间字段格式收集测试
-func TestTimeFieldConsistencyLongRun(t *testing.T) {
+// TestSystem_TimeFieldConsistencyLongRun 长时间运行的时间字段格式收集测试
+func TestSystem_TimeFieldConsistencyLongRun(t *testing.T) {
 	if os.Getenv("LONG_RUN") != "1" {
 		t.Skip("跳过长时间运行测试，设置 LONG_RUN=1 启用")
 	}
@@ -284,7 +284,7 @@ func determineMarket(symbol string) string {
 		return "未知市场"
 	}
 
-	switch {
+	sswitch {
 	case strings.HasPrefix(symbol, "6"):
 		return "上海主板"
 	case strings.HasPrefix(symbol, "688"):
@@ -302,7 +302,7 @@ func determineMarket(symbol string) string {
 
 // determineTimePattern 确定时间格式模式
 func determineTimePattern(timeField string) string {
-	switch len(timeField) {
+	sswitch len(timeField) {
 	case 14:
 		return "YYYYMMDDHHMMSS"
 	case 12:

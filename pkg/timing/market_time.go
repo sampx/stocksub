@@ -33,6 +33,11 @@ func DefaultMarketTime() *MarketTime {
 	return NewMarketTime(&SystemTimeService{})
 }
 
+// Now 返回当前时间
+func (m *MarketTime) Now() time.Time {
+	return m.timeService.Now()
+}
+
 // IsTradingTime 判断当前是否在交易时段
 func (m *MarketTime) IsTradingTime() bool {
 	now := m.timeService.Now()

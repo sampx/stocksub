@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestDefault 测试默认配置是否正确
-func TestDefault(t *testing.T) {
+// TestConfig_Default_ReturnsValidConfig 测试默认配置是否正确
+func TestConfig_Default_ReturnsValidConfig(t *testing.T) {
 	cfg := Default()
 	
 	// 验证默认配置值
@@ -33,8 +33,8 @@ func TestDefault(t *testing.T) {
 	assert.Equal(t, 30, cfg.Logger.MaxAge)
 }
 
-// TestValidate 测试配置验证功能
-func TestValidate(t *testing.T) {
+// TestConfig_Validate_WithInvalidConfig_ReturnsError 测试配置验证功能
+func TestConfig_Validate_WithInvalidConfig_ReturnsError(t *testing.T) {
 	// 测试有效的默认配置
 	cfg := Default()
 	assert.NoError(t, cfg.Validate(), "默认配置应该是有效的")
@@ -95,8 +95,8 @@ func TestValidate(t *testing.T) {
 	assert.Error(t, cfg.Validate(), "事件通道缓冲区大小为负数时应该返回错误")
 }
 
-// TestSetProviderTimeout 测试设置提供商超时时间的方法
-func TestSetProviderTimeout(t *testing.T) {
+// TestConfig_SetProviderTimeout_WithValidTimeout_ReturnsSameConfig 测试设置提供商超时时间的方法
+func TestConfig_SetProviderTimeout_WithValidTimeout_ReturnsSameConfig(t *testing.T) {
 	cfg := Default()
 	newTimeout := 30 * time.Second
 	result := cfg.SetProviderTimeout(newTimeout)
@@ -108,8 +108,8 @@ func TestSetProviderTimeout(t *testing.T) {
 	assert.Equal(t, newTimeout, cfg.Provider.Timeout, "提供商超时时间应该被正确更新")
 }
 
-// TestSetRateLimit 测试设置请求频率限制的方法
-func TestSetRateLimit(t *testing.T) {
+// TestConfig_SetRateLimit_WithValidRateLimit_ReturnsSameConfig 测试设置请求频率限制的方法
+func TestConfig_SetRateLimit_WithValidRateLimit_ReturnsSameConfig(t *testing.T) {
 	cfg := Default()
 	newRateLimit := 500 * time.Millisecond
 	result := cfg.SetRateLimit(newRateLimit)
@@ -121,8 +121,8 @@ func TestSetRateLimit(t *testing.T) {
 	assert.Equal(t, newRateLimit, cfg.Provider.RateLimit, "提供商请求频率限制应该被正确更新")
 }
 
-// TestSetDefaultInterval 测试设置默认订阅间隔的方法
-func TestSetDefaultInterval(t *testing.T) {
+// TestConfig_SetDefaultInterval_WithValidInterval_ReturnsSameConfig 测试设置默认订阅间隔的方法
+func TestConfig_SetDefaultInterval_WithValidInterval_ReturnsSameConfig(t *testing.T) {
 	cfg := Default()
 	newInterval := 10 * time.Second
 	result := cfg.SetDefaultInterval(newInterval)
@@ -134,8 +134,8 @@ func TestSetDefaultInterval(t *testing.T) {
 	assert.Equal(t, newInterval, cfg.Subscriber.DefaultInterval, "默认订阅间隔应该被正确更新")
 }
 
-// TestSetMaxSubscriptions 测试设置最大订阅数的方法
-func TestSetMaxSubscriptions(t *testing.T) {
+// TestConfig_SetMaxSubscriptions_WithValidMax_ReturnsSameConfig 测试设置最大订阅数的方法
+func TestConfig_SetMaxSubscriptions_WithValidMax_ReturnsSameConfig(t *testing.T) {
 	cfg := Default()
 	newMax := 200
 	result := cfg.SetMaxSubscriptions(newMax)
@@ -147,8 +147,8 @@ func TestSetMaxSubscriptions(t *testing.T) {
 	assert.Equal(t, newMax, cfg.Subscriber.MaxSubscriptions, "最大订阅数应该被正确更新")
 }
 
-// TestSetLogLevel 测试设置日志级别的方法
-func TestSetLogLevel(t *testing.T) {
+// TestConfig_SetLogLevel_WithValidLevel_ReturnsSameConfig 测试设置日志级别的方法
+func TestConfig_SetLogLevel_WithValidLevel_ReturnsSameConfig(t *testing.T) {
 	cfg := Default()
 	newLevel := "debug"
 	result := cfg.SetLogLevel(newLevel)

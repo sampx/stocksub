@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"stocksub/pkg/subscriber"
+	"stocksub/pkg/testkit/core"
 	"stocksub/pkg/testkit/storage"
 )
 
@@ -563,7 +564,7 @@ func errorRecoveryExample() {
 	fmt.Printf("容错写入完成: 成功 %d 条, 失败 %d 条\n", successCount, errorCount)
 
 	// 验证成功保存的数据
-	allResults, err := memStorage.Load(ctx, storage.Query{})
+	allResults, err := memStorage.Load(ctx, core.Query{})
 	if err != nil {
 		log.Printf("验证查询失败: %v", err)
 		return

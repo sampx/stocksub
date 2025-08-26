@@ -30,11 +30,6 @@ StockSub is an enterprise-grade A-share real-time data subscription service buil
 ```bash
 # Main application
 go run ./cmd/stocksub
-
-# Examples for testing
-go run ./examples/simple      # Basic subscription demo
-go run ./examples/advanced    # Manager with statistics
-
 # API Monitoring (long-term data collection)
 go run ./cmd/api_monitor -symbols=600000,000001 -duration=5m -interval=3s
 go run ./cmd/api_monitor -symbols=600000 -duration=24h -data-dir=./collected_data
@@ -55,6 +50,8 @@ go test -v -tags=integration ./pkg/provider/tencent/
 go test -v -tags=integration ./tests/
 # Run Performance Benchmarks:
 go test -v -bench=. -benchmem ./pkg/testkit/
+go test -v -coverprofile=coverage.out ./pkg/...
+go tool cover -func=coverage.out
 ```
 
 ## Testing Architecture

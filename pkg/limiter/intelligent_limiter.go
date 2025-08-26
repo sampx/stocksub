@@ -19,6 +19,7 @@ type IntelligentLimiter struct {
 	consecutiveSame  int          // 连续相同数据计数
 	lastData         string       // 最后获取的数据指纹
 	isInitialized    bool         // 是否已初始化 batch
+	tradingEnd       time.Time    // 交易结束时间
 	
 	// 统计信息
 	totalRequests    int64
@@ -53,6 +54,7 @@ func (l *IntelligentLimiter) InitializeBatch(symbols []string) {
 	l.lastData = ""
 	l.isInitialized = true
 	l.forceStopFlag = false
+	l.tradingEnd = l.marketTime.GetTradingEndTime()
 	
 	// 预检查时间有效性
 	if !l.marketTime.IsTradingTime() {
@@ -155,10 +157,8 @@ func (l *IntelligentLimiter) RecordResult(err error, data []string) (
 		}
 		
 		// 检查重试时间是否在有效范围内
-		nextRetryTime := time.Now().Add(waitDuration)
-		tradingEnd := l.marketTime.GetTradingEndTime()
-		
-		if !l.classifier.IsRetryAllowedInTime(nextRetryTime, tradingEnd) {
+		nextRetryTime := l.marketTime.Now().Add(waitDuration)
+		if !l.classifier.IsRetryAllowedInTime(nextRetryTime, l.tradingEnd) {
 			return false, 0, errors.New("重试时间超出交易时段，终止操作")
 		}
 		

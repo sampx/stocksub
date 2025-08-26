@@ -1,3 +1,4 @@
+
 package testkit_test
 
 import (
@@ -6,7 +7,9 @@ import (
 	"runtime"
 	"stocksub/pkg/subscriber"
 	"stocksub/pkg/testkit"
+	"stocksub/pkg/testkit/cache"
 	"stocksub/pkg/testkit/config"
+	
 	"stocksub/pkg/testkit/storage"
 	"testing"
 	"time"
@@ -20,6 +23,15 @@ func BenchmarkTestDataManager_GetStockData_VariousSizes(b *testing.B) {
 	}
 	manager := testkit.NewTestDataManager(cfg)
 	defer manager.Close()
+
+	// 启用Mock模式，避免真实API调用
+	manager.EnableMock(true)
+	allSymbols := []string{"600000", "000001", "688036", "835174", "300750"}
+	mockData := make([]subscriber.StockData, len(allSymbols))
+	for i, s := range allSymbols {
+		mockData[i] = subscriber.StockData{Symbol: s, Price: 100.0 + float64(i)}
+	}
+	manager.SetMockData(allSymbols, mockData)
 
 	b.Run("GetStockData_SmallBatch", func(b *testing.B) {
 		symbols := []string{"600000", "000001"}
@@ -102,7 +114,7 @@ func BenchmarkCSVStorage_WriteOperations_SingleAndBatch(b *testing.B) {
 		ctx := context.Background()
 
 		b.ResetTimer()
-		b.ReportAllocs()
+        b.ReportAllocs()
 
 		for i := 0; i < b.N; i++ {
 			if err := storage.BatchSave(ctx, batchData); err != nil {
@@ -126,7 +138,14 @@ func BenchmarkTestDataManager_GetStockData_MemoryUsage(b *testing.B) {
 		manager := testkit.NewTestDataManager(cfg)
 		defer manager.Close()
 
+		// 启用Mock模式，避免真实API调用
+		manager.EnableMock(true)
 		symbols := []string{"600000", "000001", "688036", "835174", "300750"}
+		mockData := make([]subscriber.StockData, len(symbols))
+		for i, s := range symbols {
+			mockData[i] = subscriber.StockData{Symbol: s, Price: 100.0 + float64(i)}
+		}
+		manager.SetMockData(symbols, mockData)
 		ctx := context.Background()
 		_, _ = manager.GetStockData(ctx, symbols) // 预热
 
@@ -159,7 +178,14 @@ func BenchmarkManagerAndStorage_Concurrency_ReadAndWrite(b *testing.B) {
 		manager := testkit.NewTestDataManager(cfg)
 		defer manager.Close()
 
+		// 启用Mock模式，避免真实API调用
+		manager.EnableMock(true)
 		symbols := []string{"600000", "000001"}
+		mockData := []subscriber.StockData{
+			{Symbol: "600000", Price: 100.0},
+			{Symbol: "000001", Price: 200.0},
+		}
+		manager.SetMockData(symbols, mockData)
 		ctx := context.Background()
 		_, _ = manager.GetStockData(ctx, symbols) // 预热
 
@@ -197,4 +223,268 @@ func BenchmarkManagerAndStorage_Concurrency_ReadAndWrite(b *testing.B) {
 			}
 		})
 	})
+}
+
+func BenchmarkTestDataManager_GetStockData(b *testing.B) {
+	tmpDir := b.TempDir()
+
+	cfg := &config.Config{
+		Cache: config.CacheConfig{
+			Type:    "memory",
+			MaxSize: 1000,
+			TTL:     10 * time.Minute,
+		},
+		Storage: config.StorageConfig{
+			Type:      "memory",
+			Directory: tmpDir,
+		},
+	}
+
+	manager := testkit.NewTestDataManager(cfg)
+	defer manager.Close()
+
+	ctx := context.Background()
+	symbols := []string{"BENCH001", "BENCH002"}
+
+	// 启用Mock模式
+	manager.EnableMock(true)
+	mockData := []subscriber.StockData{
+		{Symbol: "BENCH001", Price: 100.00},
+		{Symbol: "BENCH002", Price: 200.00},
+	}
+	manager.SetMockData(symbols, mockData)
+
+	// 预热
+	manager.GetStockData(ctx, symbols)
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			manager.GetStockData(ctx, symbols)
+		}
+	})
+}
+
+// --- Migrated Benchmarks from pkg/testkit/cache ---
+
+// BenchmarkCache_Layered_Set measures the performance of setting values in a layered cache.
+// Origin: pkg/testkit/cache/layered_bench_test.go
+func BenchmarkCache_Layered_Set(b *testing.B) {
+	config := cache.LayeredCacheConfig{
+		Layers: []cache.LayerConfig{
+			{
+				Type:    cache.LayerMemory,
+				MaxSize: 1000,
+				TTL:     5 * time.Minute,
+				Enabled: true,
+				Policy:  cache.PolicyLRU,
+			},
+			{
+				Type:    cache.LayerMemory,
+				MaxSize: 5000,
+				TTL:     30 * time.Minute,
+				Enabled: true,
+				Policy:  cache.PolicyLFU,
+			},
+		},
+		PromoteEnabled: false,
+		WriteThrough:   false,
+		WriteBack:      false,
+	}
+
+	layeredCache, err := cache.NewLayeredCache(config)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer layeredCache.Close()
+
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		key := fmt.Sprintf("key%d", i)
+		value := fmt.Sprintf("value%d", i)
+		layeredCache.Set(ctx, key, value, 0)
+	}
+}
+
+// BenchmarkCache_Layered_Get measures the performance of getting values from a layered cache.
+// Origin: pkg/testkit/cache/layered_bench_test.go
+func BenchmarkCache_Layered_Get(b *testing.B) {
+	config := cache.LayeredCacheConfig{
+		Layers: []cache.LayerConfig{
+			{
+				Type:    cache.LayerMemory,
+				MaxSize: 1000,
+				TTL:     5 * time.Minute,
+				Enabled: true,
+				Policy:  cache.PolicyLRU,
+			},
+		},
+		PromoteEnabled: false,
+		WriteThrough:   false,
+		WriteBack:      false,
+	}
+
+	layeredCache, err := cache.NewLayeredCache(config)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer layeredCache.Close()
+
+	ctx := context.Background()
+
+	// Pre-fill data
+	for i := 0; i < 1000; i++ {
+		key := fmt.Sprintf("key%d", i)
+		value := fmt.Sprintf("value%d", i)
+		layeredCache.Set(ctx, key, value, 0)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		key := fmt.Sprintf("key%d", i%1000)
+		layeredCache.Get(ctx, key)
+	}
+}
+
+// BenchmarkCache_Layered_BatchOperations measures the performance of batch operations in a layered cache.
+// Origin: pkg/testkit/cache/layered_bench_test.go
+func BenchmarkCache_Layered_BatchOperations(b *testing.B) {
+	config := cache.LayeredCacheConfig{
+		Layers: []cache.LayerConfig{
+			{
+				Type:    cache.LayerMemory,
+				MaxSize: 10000,
+				TTL:     5 * time.Minute,
+				Enabled: true,
+				Policy:  cache.PolicyLRU,
+			},
+		},
+		PromoteEnabled: false,
+		WriteThrough:   false,
+		WriteBack:      false,
+	}
+
+	layeredCache, err := cache.NewLayeredCache(config)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer layeredCache.Close()
+
+	ctx := context.Background()
+
+	// Prepare batch data
+	batchSize := 100
+	items := make(map[string]any, batchSize)
+	for i := 0; i < batchSize; i++ {
+		key := fmt.Sprintf("batch_key%d", i)
+		items[key] = fmt.Sprintf("batch_value%d", i)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// Batch set
+		layeredCache.BatchSet(ctx, items, 0)
+
+		// Batch get
+		keys := make([]string, 0, batchSize)
+		for k := range items {
+			keys = append(keys, k)
+		}
+		layeredCache.BatchGet(ctx, keys)
+	}
+}
+
+// BenchmarkCache_Layered_WriteThrough measures the performance of write-through mode in a layered cache.
+// Origin: pkg/testkit/cache/layered_bench_test.go
+func BenchmarkCache_Layered_WriteThrough(b *testing.B) {
+	config := cache.LayeredCacheConfig{
+		Layers: []cache.LayerConfig{
+			{
+				Type:    cache.LayerMemory,
+				MaxSize: 1000,
+				TTL:     5 * time.Minute,
+				Enabled: true,
+				Policy:  cache.PolicyLRU,
+			},
+			{
+				Type:    cache.LayerMemory,
+				MaxSize: 5000,
+				TTL:     30 * time.Minute,
+				Enabled: true,
+				Policy:  cache.PolicyLFU,
+			},
+		},
+		PromoteEnabled: false,
+		WriteThrough:   true, // Enable write-through
+		WriteBack:      false,
+	}
+
+	layeredCache, err := cache.NewLayeredCache(config)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer layeredCache.Close()
+
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		key := fmt.Sprintf("write_through_key%d", i)
+		value := fmt.Sprintf("write_through_value%d", i)
+		layeredCache.Set(ctx, key, value, 0)
+	}
+}
+
+// --- Migrated Benchmarks from pkg/testkit/cache/memory_test.go ---
+
+// BenchmarkCache_Memory_Set measures the performance of setting values in a memory cache.
+// Origin: pkg/testkit/cache/memory_test.go
+func BenchmarkCache_Memory_Set(b *testing.B) {
+	config := cache.MemoryCacheConfig{
+		MaxSize:         10000,
+		DefaultTTL:      5 * time.Minute,
+		CleanupInterval: 1 * time.Minute,
+	}
+
+	memCache := cache.NewMemoryCache(config)
+	defer memCache.Close()
+
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		key := fmt.Sprintf("key%d", i)
+		value := fmt.Sprintf("value%d", i)
+		memCache.Set(ctx, key, value, 0)
+	}
+}
+
+// BenchmarkCache_Memory_Get measures the performance of getting values from a memory cache.
+// Origin: pkg/testkit/cache/memory_test.go
+func BenchmarkCache_Memory_Get(b *testing.B) {
+	config := cache.MemoryCacheConfig{
+		MaxSize:         10000,
+		DefaultTTL:      5 * time.Minute,
+		CleanupInterval: 1 * time.Minute,
+	}
+
+	memCache := cache.NewMemoryCache(config)
+	defer memCache.Close()
+
+	ctx := context.Background()
+
+	// Pre-fill data
+	for i := 0; i < 1000; i++ {
+		key := fmt.Sprintf("key%d", i)
+		value := fmt.Sprintf("value%d", i)
+		memCache.Set(ctx, key, value, 0)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		key := fmt.Sprintf("key%d", i%1000)
+		memCache.Get(ctx, key)
+	}
 }
