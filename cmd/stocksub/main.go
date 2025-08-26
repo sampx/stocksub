@@ -9,6 +9,7 @@ import (
 
 	"stocksub/pkg/config"
 	"stocksub/pkg/logger"
+	"stocksub/pkg/provider"
 	"stocksub/pkg/provider/tencent"
 	"stocksub/pkg/subscriber"
 
@@ -34,11 +35,33 @@ func main() {
 
 	log.Infof("StockSub starting...")
 
-	// 创建数据提供商
-	provider := tencent.NewProvider()
+	// 创建 ProviderManager (新架构)
+	providerManager := provider.NewProviderManager()
 
-	// 创建订阅器
-	sub := subscriber.NewSubscriber(provider)
+	// 创建腾讯数据提供商
+	tencentProvider := tencent.NewProvider()
+
+	// 注册提供商到管理器
+	err := providerManager.RegisterProvider("tencent", tencentProvider)
+	if err != nil {
+		log.Errorf("Failed to register tencent provider: %v", err)
+		os.Exit(1)
+	}
+
+	// 获取实时股票数据提供商 (通过新接口)
+	stockProvider, err := providerManager.GetRealtimeStockProvider("tencent")
+	if err != nil {
+		log.Errorf("Failed to get stock provider: %v", err)
+		// 回退到旧实现
+		log.Warnf("Falling back to legacy provider...")
+		stockProvider = tencentProvider
+	}
+
+	log.Infof("Using provider: %s (health: %v)", stockProvider.Name(), stockProvider.IsHealthy())
+
+	// 创建订阅器 (兼容模式：使用原始腾讯提供商以保证兼容性)
+	// 注意：NewSubscriber 返回 *DefaultSubscriber，而不是接口
+	sub := subscriber.NewSubscriber(tencentProvider)
 
 	// 创建管理器
 	manager := subscriber.NewManager(sub)
@@ -81,6 +104,12 @@ func main() {
 
 	log.Infof("收到退出信号，正在关闭...")
 	manager.Stop()
+	
+	// 清理 ProviderManager
+	if err := providerManager.Close(); err != nil {
+		log.Warnf("Error closing provider manager: %v", err)
+	}
+	
 	log.Infof("已退出")
 }
 
