@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # Redis 服务 - 用作消息队列和缓存
+  redis:
+    image: redis:7-alpine
+    container_name: stocksub-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass stocksub_redis_pass
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - stocksub-network
+
+  # InfluxDB 服务 - 用作时序数据存储
+  influxdb:
+    image: influxdb:2.7
+    container_name: stocksub-influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=stocksub_influx_pass
+      - DOCKER_INFLUXDB_INIT_ORG=stocksub
+      - DOCKER_INFLUXDB_INIT_BUCKET=stocksub_data
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=stocksub_influx_token
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - stocksub-network
+
+  # 可选: Redis 管理界面
+  # redis-commander:
+  #   image: rediscommander/redis-commander:latest
+  #   container_name: stocksub-redis-commander
+  #   ports:
+  #     - "8081:8081"
+  #   environment:
+  #     - REDIS_HOSTS=local:redis:6379:0:stocksub_redis_pass
+  #   depends_on:
+  #     - redis
+  #   restart: unless-stopped
+  #   networks:
+  #     - stocksub-network
+
+  # 可选: InfluxDB 管理界面 (Chronograf)
+  # chronograf:
+  #   image: chronograf:1.10
+  #   container_name: stocksub-chronograf
+  #   ports:
+  #     - "8888:8888"
+  #   environment:
+  #     - INFLUXDB_URL=http://influxdb:8086
+  #   depends_on:
+  #     - influxdb
+  #   restart: unless-stopped
+  #   networks:
+  #     - stocksub-network
+
+volumes:
+  redis_data:
+    driver: local
+  influxdb_data:
+    driver: local
+
+networks:
+  stocksub-network:
+    driver: bridge
+    name: stocksub-network

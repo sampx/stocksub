@@ -5,7 +5,7 @@ package testkit
 import (
 	"context"
 	"fmt"
-	
+
 	"sync"
 	"time"
 
@@ -47,7 +47,7 @@ type enhancedStats struct {
 //
 // 参数:
 //   - cfg: 指向 config.Config 的指针，用于配置管理器的所有行为，
-//          包括缓存策略、存储类型和目录等。
+//     包括缓存策略、存储类型和目录等。
 //
 // 返回:
 //   - 一个实现了 core.TestDataManager 接口的实例。
@@ -213,10 +213,10 @@ func (tdm *testDataManager) GetStats() core.Stats {
 	cacheStats := tdm.cache.Stats()
 
 	return core.Stats{
-		CacheSize:   cacheStats.Size,
-		TTL:         tdm.config.Cache.TTL,
-		Directory:   tdm.config.Storage.Directory,
-		
+		CacheSize: cacheStats.Size,
+		TTL:       tdm.config.Cache.TTL,
+		Directory: tdm.config.Storage.Directory,
+
 		CacheHits:   tdm.stats.cacheHits + cacheStats.HitCount,
 		CacheMisses: tdm.stats.cacheMisses + cacheStats.MissCount,
 	}
@@ -292,14 +292,14 @@ func (tdm *testDataManager) GetAdvancedStats() map[string]interface{} {
 	cacheStats := tdm.cache.Stats()
 
 	return map[string]interface{}{
-		"session_id":        tdm.sessionID,
-		"cache_enabled":     tdm.cacheEnabled,
-		"cache_stats":       cacheStats,
-		"api_calls":         tdm.stats.apiCalls,
-		"storage_writes":    tdm.stats.storageWrites,
-		"storage_reads":     tdm.stats.storageReads,
-		"mock_calls":        tdm.stats.mockCalls,
-		"last_activity":     tdm.stats.lastActivity,
+		"session_id":     tdm.sessionID,
+		"cache_enabled":  tdm.cacheEnabled,
+		"cache_stats":    cacheStats,
+		"api_calls":      tdm.stats.apiCalls,
+		"storage_writes": tdm.stats.storageWrites,
+		"storage_reads":  tdm.stats.storageReads,
+		"mock_calls":     tdm.stats.mockCalls,
+		"last_activity":  tdm.stats.lastActivity,
 	}
 }
 

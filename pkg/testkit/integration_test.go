@@ -69,7 +69,7 @@ func TestTestDataManager_GetStockData_WithMockData_ReturnsExpectedResults(t *tes
 	assert.Equal(t, "INTG001", data1[0].Symbol)
 	assert.Equal(t, "INTG002", data1[1].Symbol)
 
-		// Note: In this integration test, we are primarily concerned with the end-to-end flow.
+	// Note: In this integration test, we are primarily concerned with the end-to-end flow.
 	// Detailed cache stats are verified in TestTestkit_TestDataManager_CacheIntegration.
 	_ = manager.GetStats() // 获取统计信息但不使用，避免编译警告
 }

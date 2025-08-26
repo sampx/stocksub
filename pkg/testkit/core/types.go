@@ -66,19 +66,19 @@ type CacheEntry struct {
 // CacheStats 包含了缓存的详细统计信息。
 type CacheStats struct {
 	Size        int64         `json:"size"`         // 当前缓存中的条目数
-	MaxSize     int64         `json:"max_size"`      // 缓存最大容量
-	HitCount    int64         `json:"hit_count"`     // 命中次数
-	MissCount   int64         `json:"miss_count"`    // 未命中次数
-	HitRate     float64       `json:"hit_rate"`      // 命中率
+	MaxSize     int64         `json:"max_size"`     // 缓存最大容量
+	HitCount    int64         `json:"hit_count"`    // 命中次数
+	MissCount   int64         `json:"miss_count"`   // 未命中次数
+	HitRate     float64       `json:"hit_rate"`     // 命中率
 	TTL         time.Duration `json:"ttl"`          // 默认的生存时间
-	LastCleanup time.Time     `json:"last_cleanup"`  // 最后一次清理过期条目的时间
+	LastCleanup time.Time     `json:"last_cleanup"` // 最后一次清理过期条目的时间
 }
 
 // Stats 包含了 TestDataManager 的高级统计信息。
 type Stats struct {
 	CacheSize   int64         `json:"cache_size"`   // 缓存中的条目总数
-	TTL         time.Duration `json:"ttl"`         // 缓存的默认生存时间
-	Directory   string        `json:"directory"`   // 持久化存储的目录
+	TTL         time.Duration `json:"ttl"`          // 缓存的默认生存时间
+	Directory   string        `json:"directory"`    // 持久化存储的目录
 	MockMode    bool          `json:"mock_mode"`    // Mock模式是否启用
 	CacheHits   int64         `json:"cache_hits"`   // 缓存总命中数
 	CacheMisses int64         `json:"cache_misses"` // 缓存总未命中数
@@ -87,8 +87,8 @@ type Stats struct {
 // Query 定义了在存储层进行数据查询的条件。
 type Query struct {
 	Symbols   []string  `json:"symbols"`    // 目标股票代码
-	StartTime time.Time `json:"start_time"`  // 查询的开始时间
-	EndTime   time.Time `json:"end_time"`    // 查询的结束时间
+	StartTime time.Time `json:"start_time"` // 查询的开始时间
+	EndTime   time.Time `json:"end_time"`   // 查询的结束时间
 	Fields    []string  `json:"fields"`     // 需要返回的字段
 	Limit     int       `json:"limit"`      // 返回记录的最大数量
 	Offset    int       `json:"offset"`     // 返回记录的偏移量
@@ -98,7 +98,7 @@ type Query struct {
 type Record struct {
 	Type      string      `json:"type"`      // 数据类型 (e.g., "stock_data", "performance_metric")
 	Symbol    string      `json:"symbol"`    // 关联的股票代码
-	Timestamp time.Time   `json:"timestamp"`  // 记录生成的时间戳
+	Timestamp time.Time   `json:"timestamp"` // 记录生成的时间戳
 	Date      string      `json:"date"`      // 记录生成的日期 (YYYY-MM-DD)
 	Fields    []string    `json:"fields"`    // 用于CSV存储的字段数组
 	Data      interface{} `json:"data"`      // 原始数据对象
@@ -106,19 +106,19 @@ type Record struct {
 
 // MockScenario 定义了一个完整的模拟场景，用于高级Mock测试。
 type MockScenario struct {
-	Name        string                  `yaml:"name"`        // 场景名称，唯一标识
-	Description string                  `yaml:"description"` // 场景描述
-	Responses   map[string]MockResponse `yaml:"responses"`   // 针对不同symbol的模拟响应
+	Name        string                   `yaml:"name"`        // 场景名称，唯一标识
+	Description string                   `yaml:"description"` // 场景描述
+	Responses   map[string]MockResponse  `yaml:"responses"`   // 针对不同symbol的模拟响应
 	Delays      map[string]time.Duration `yaml:"delays"`      // 针对不同symbol的模拟延迟
-	Errors      map[string]error        `yaml:"errors"`      // 针对不同symbol的模拟错误
-	CallCounts  map[string]int          `yaml:"call_counts"` // 调用次数统计
+	Errors      map[string]error         `yaml:"errors"`      // 针对不同symbol的模拟错误
+	CallCounts  map[string]int           `yaml:"call_counts"` // 调用次数统计
 }
 
 // MockResponse 定义了一个具体的模拟响应。
 type MockResponse struct {
-	Data      []subscriber.StockData `yaml:"data"`      // 模拟的股票数据
-	Error     string                 `yaml:"error"`     // 模拟的错误信息
-	Delay     time.Duration          `yaml:"delay"`     // 模拟的延迟
+	Data      []subscriber.StockData `yaml:"data"`       // 模拟的股票数据
+	Error     string                 `yaml:"error"`      // 模拟的错误信息
+	Delay     time.Duration          `yaml:"delay"`      // 模拟的延迟
 	CallCount int                    `yaml:"call_count"` // 预期的调用次数
 }
 

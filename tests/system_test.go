@@ -9,10 +9,10 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"stocksub/pkg/subscriber"
 	"stocksub/pkg/testkit"
 	"stocksub/pkg/testkit/config"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -284,7 +284,7 @@ func determineMarket(symbol string) string {
 		return "未知市场"
 	}
 
-	sswitch {
+	switch {
 	case strings.HasPrefix(symbol, "6"):
 		return "上海主板"
 	case strings.HasPrefix(symbol, "688"):
@@ -302,7 +302,7 @@ func determineMarket(symbol string) string {
 
 // determineTimePattern 确定时间格式模式
 func determineTimePattern(timeField string) string {
-	sswitch len(timeField) {
+	switch len(timeField) {
 	case 14:
 		return "YYYYMMDDHHMMSS"
 	case 12:

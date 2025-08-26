@@ -1,4 +1,4 @@
-// Package storage 
+// Package storage
 // 提供了 testkit 的存储层实现，包括CSV文件存储、内存存储和批量写入等功能。
 package storage
 
@@ -29,27 +29,27 @@ type BatchWriter struct {
 
 // BatchWriterConfig 定义了 BatchWriter 的配置选项。
 type BatchWriterConfig struct {
-	BatchSize                 int           `yaml:"batch_size"`                    // 触发批量写入的批次大小。
-	FlushInterval             time.Duration `yaml:"flush_interval"`                // 定期将缓冲区数据写入存储的时间间隔。
-	MaxBufferSize             int           `yaml:"max_buffer_size"`               // 缓冲区中可容纳的最大记录数，防止内存无限增长。
-	EnableAsync               bool          `yaml:"enable_async"`                  // 是否启用异步写入。如果为true，批量写入将在独立的goroutine中执行。
-	EnableStructuredDataOptim bool          `yaml:"enable_structured_data_optim"`  // 是否启用 StructuredData 优化
-	StructuredDataBatchSize   int           `yaml:"structured_data_batch_size"`    // StructuredData 的特别批次大小
-	StructuredDataFlushDelay  time.Duration `yaml:"structured_data_flush_delay"`   // StructuredData 刷新延迟（用于合并同类型数据）
+	BatchSize                 int           `yaml:"batch_size"`                   // 触发批量写入的批次大小。
+	FlushInterval             time.Duration `yaml:"flush_interval"`               // 定期将缓冲区数据写入存储的时间间隔。
+	MaxBufferSize             int           `yaml:"max_buffer_size"`              // 缓冲区中可容纳的最大记录数，防止内存无限增长。
+	EnableAsync               bool          `yaml:"enable_async"`                 // 是否启用异步写入。如果为true，批量写入将在独立的goroutine中执行。
+	EnableStructuredDataOptim bool          `yaml:"enable_structured_data_optim"` // 是否启用 StructuredData 优化
+	StructuredDataBatchSize   int           `yaml:"structured_data_batch_size"`   // StructuredData 的特别批次大小
+	StructuredDataFlushDelay  time.Duration `yaml:"structured_data_flush_delay"`  // StructuredData 刷新延迟（用于合并同类型数据）
 }
 
 // BatchWriterStats 包含了 BatchWriter 的运行统计信息。
 type BatchWriterStats struct {
-	TotalBatches               int64     `json:"total_batches"`                 // 已成功写入的总批次数。
-	TotalRecords               int64     `json:"total_records"`                 // 已成功写入的总记录数。
-	BufferSize                 int       `json:"buffer_size"`                   // 当前缓冲区中的记录数。
-	LastFlush                  time.Time `json:"last_flush"`                    // 最后一次成功刷新的时间。
-	FlushErrors                int64     `json:"flush_errors"`                  // 刷新（写入）失败的次数。
-	BufferOverflows            int64     `json:"buffer_overflows"`              // 因缓冲区满而导致强制刷新的次数。
-	StructuredDataBatches      int64     `json:"structured_data_batches"`       // StructuredData 的批次数
-	StructuredDataRecords      int64     `json:"structured_data_records"`       // StructuredData 的记录数
-	StructuredDataBufferSize   int       `json:"structured_data_buffer_size"`   // StructuredData 缓冲区大小
-	StructuredDataFlushes      int64     `json:"structured_data_flushes"`       // StructuredData 专用刷新次数
+	TotalBatches             int64     `json:"total_batches"`               // 已成功写入的总批次数。
+	TotalRecords             int64     `json:"total_records"`               // 已成功写入的总记录数。
+	BufferSize               int       `json:"buffer_size"`                 // 当前缓冲区中的记录数。
+	LastFlush                time.Time `json:"last_flush"`                  // 最后一次成功刷新的时间。
+	FlushErrors              int64     `json:"flush_errors"`                // 刷新（写入）失败的次数。
+	BufferOverflows          int64     `json:"buffer_overflows"`            // 因缓冲区满而导致强制刷新的次数。
+	StructuredDataBatches    int64     `json:"structured_data_batches"`     // StructuredData 的批次数
+	StructuredDataRecords    int64     `json:"structured_data_records"`     // StructuredData 的记录数
+	StructuredDataBufferSize int       `json:"structured_data_buffer_size"` // StructuredData 缓冲区大小
+	StructuredDataFlushes    int64     `json:"structured_data_flushes"`     // StructuredData 专用刷新次数
 }
 
 // NewBatchWriter 创建一个新的 BatchWriter 实例。
@@ -218,7 +218,7 @@ func (bw *BatchWriter) flushBuffer(ctx context.Context) error {
 	copy(dataToFlush, bw.buffer)
 	bw.buffer = bw.buffer[:0]
 
-	if batchSaver, ok := bw.storage.(interface{
+	if batchSaver, ok := bw.storage.(interface {
 		BatchSave(context.Context, []interface{}) error
 	}); ok {
 		if err := batchSaver.BatchSave(ctx, dataToFlush); err != nil {
@@ -300,7 +300,7 @@ func DefaultBatchWriterConfig() BatchWriterConfig {
 		MaxBufferSize:             1000,
 		EnableAsync:               true,
 		EnableStructuredDataOptim: true,
-		StructuredDataBatchSize:   50,  // 更小的批次大小用于更频繁的刷新
+		StructuredDataBatchSize:   50,              // 更小的批次大小用于更频繁的刷新
 		StructuredDataFlushDelay:  2 * time.Second, // 更短的延迟时间
 	}
 }

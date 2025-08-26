@@ -131,3 +131,5 @@ go tool cover -func=coverage.out
 - Centralized API call management with circuit breaking
 - Error classification and retry strategy management
 
+
+- 由于本项目有对外 api 调用限制,你不能自己运行集成测试和基准测试,如果非常必要,你要让用户自己运行.

@@ -41,16 +41,16 @@ type PerformanceMetric struct {
 
 // APIMonitor API监控器
 type APIMonitor struct {
-	config            MonitorConfig
-	provider          *tencent.Provider
-	storage           *storage.CSVStorage
-	logger            *log.Logger
-	logFile           *os.File
-	cancel            context.CancelFunc
-	stopped           bool
+	config   MonitorConfig
+	provider *tencent.Provider
+	storage  *storage.CSVStorage
+	logger   *log.Logger
+	logFile  *os.File
+	cancel   context.CancelFunc
+	stopped  bool
 
 	// 安全组件
-	marketTime        *timing.MarketTime
+	marketTime         *timing.MarketTime
 	intelligentLimiter *limiter.IntelligentLimiter
 }
 
@@ -126,7 +126,7 @@ func main() {
 	case sig := <-sigChan:
 		fmt.Printf("\n收到信号 %v，正在停止监控...\n", sig)
 		cancel() // 触发取消
-		<-done  // 等待监控完全停止
+		<-done   // 等待监控完全停止
 	}
 
 	fmt.Println("监控已停止")
@@ -177,12 +177,12 @@ func NewAPIMonitor(config MonitorConfig) (*APIMonitor, error) {
 	intelligentLimiter := limiter.NewIntelligentLimiter(marketTime)
 
 	monitor := &APIMonitor{
-		config:            config,
-		provider:          provider,
-		storage:           csvStorage,
-		logger:            logger,
-		logFile:           logFile,
-		marketTime:        marketTime,
+		config:             config,
+		provider:           provider,
+		storage:            csvStorage,
+		logger:             logger,
+		logFile:            logFile,
+		marketTime:         marketTime,
 		intelligentLimiter: intelligentLimiter,
 	}
 

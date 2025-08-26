@@ -1,0 +1,177 @@
+version: '3.8'
+
+services:
+  # Redis 集群模式（生产环境）
+  redis:
+    image: redis:7-alpine
+    container_name: stocksub-redis-prod
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_prod:/data
+    command: >
+      redis-server 
+      --appendonly yes 
+      --requirepass production_redis_pass_2024
+      --maxmemory 1gb
+      --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "production_redis_pass_2024", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+    networks:
+      - stocksub-prod-network
+
+  # InfluxDB 生产配置
+  influxdb:
+    image: influxdb:2.7
+    container_name: stocksub-influxdb-prod
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=production_admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=production_influx_pass_2024
+      - DOCKER_INFLUXDB_INIT_ORG=stocksub_production
+      - DOCKER_INFLUXDB_INIT_BUCKET=stocksub_data_prod
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=production_influx_token_2024
+      - INFLUXDB_HTTP_MAX_BODY_SIZE=0
+    volumes:
+      - influxdb_data_prod:/var/lib/influxdb2
+      - ./config/influxdb:/etc/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+    networks:
+      - stocksub-prod-network
+
+  # Provider Node 实例（多个实例负载均衡）
+  provider-node-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: provider-node
+    container_name: stocksub-provider-node-1
+    environment:
+      - NODE_ID=provider-node-1
+      - REDIS_URL=redis://:production_redis_pass_2024@redis:6379/0
+      - CONFIG_FILE=/app/config/jobs.yaml
+    volumes:
+      - ./config:/app/config
+      - ./data:/app/data
+    depends_on:
+      - redis
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    networks:
+      - stocksub-prod-network
+
+  provider-node-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: provider-node
+    container_name: stocksub-provider-node-2
+    environment:
+      - NODE_ID=provider-node-2
+      - REDIS_URL=redis://:production_redis_pass_2024@redis:6379/0
+      - CONFIG_FILE=/app/config/jobs.yaml
+    volumes:
+      - ./config:/app/config
+      - ./data:/app/data
+    depends_on:
+      - redis
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    networks:
+      - stocksub-prod-network
+
+  # Collector 服务
+  influxdb-collector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: collector
+    container_name: stocksub-influxdb-collector
+    environment:
+      - REDIS_URL=redis://:production_redis_pass_2024@redis:6379/0
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=production_influx_token_2024
+      - CONSUMER_GROUP=influxdb-collectors
+    depends_on:
+      - redis
+      - influxdb
+    restart: always
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    networks:
+      - stocksub-prod-network
+
+  # API Server
+  api-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api-server
+    container_name: stocksub-api-server
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_URL=redis://:production_redis_pass_2024@redis:6379/0
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=production_influx_token_2024
+    depends_on:
+      - redis
+      - influxdb
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    networks:
+      - stocksub-prod-network
+
+volumes:
+  redis_data_prod:
+    driver: local
+  influxdb_data_prod:
+    driver: local
+
+networks:
+  stocksub-prod-network:
+    driver: bridge
+    name: stocksub-prod-network

@@ -90,10 +90,10 @@ func complexSchemaExample() {
 				Required:    true,
 			},
 			"implied_volatility": {
-				Name:        "implied_volatility",
-				Type:        subscriber.FieldTypeFloat64,
-				Description: "隐含波动率",
-				Required:    false,
+				Name:         "implied_volatility",
+				Type:         subscriber.FieldTypeFloat64,
+				Description:  "隐含波动率",
+				Required:     false,
 				DefaultValue: 0.0,
 			},
 			"delta": {
@@ -121,17 +121,17 @@ func complexSchemaExample() {
 				Required:    false,
 			},
 			"open_interest": {
-				Name:        "open_interest",
-				Type:        subscriber.FieldTypeInt,
-				Description: "持仓量",
-				Required:    false,
+				Name:         "open_interest",
+				Type:         subscriber.FieldTypeInt,
+				Description:  "持仓量",
+				Required:     false,
 				DefaultValue: int64(0),
 			},
 			"trading_volume": {
-				Name:        "trading_volume",
-				Type:        subscriber.FieldTypeInt,
-				Description: "成交量",
-				Required:    false,
+				Name:         "trading_volume",
+				Type:         subscriber.FieldTypeInt,
+				Description:  "成交量",
+				Required:     false,
 				DefaultValue: int64(0),
 			},
 		},
@@ -152,7 +152,7 @@ func complexSchemaExample() {
 
 	// 设置期权数据
 	expiryDate := time.Now().AddDate(0, 3, 0) // 3个月后到期
-	
+
 	optionData.SetFieldSafe("option_code", "50ETF2503C3000")
 	optionData.SetFieldSafe("underlying_asset", "510050")
 	optionData.SetFieldSafe("option_type", "CALL")
@@ -179,8 +179,8 @@ func complexSchemaExample() {
 	gamma, _ := optionData.GetField("gamma")
 	theta, _ := optionData.GetField("theta")
 	vega, _ := optionData.GetField("vega")
-	
-	fmt.Printf("希腊字母 - Delta: %.4f, Gamma: %.4f, Theta: %.4f, Vega: %.4f\n", 
+
+	fmt.Printf("希腊字母 - Delta: %.4f, Gamma: %.4f, Theta: %.4f, Vega: %.4f\n",
 		delta, gamma, theta, vega)
 }
 
@@ -210,7 +210,7 @@ func dataPipelineExample() {
 
 	// 模拟实时数据流
 	fmt.Println("启动模拟数据流水线...")
-	
+
 	// 数据生成器
 	dataChannel := make(chan *subscriber.StructuredData, 100)
 	errorChannel := make(chan error, 10)
@@ -218,15 +218,15 @@ func dataPipelineExample() {
 	// 启动数据生成goroutine
 	go func() {
 		defer close(dataChannel)
-		
+
 		for i := 0; i < 100; i++ {
 			stockData := subscriber.NewStructuredData(subscriber.StockDataSchema)
-			
+
 			symbol := fmt.Sprintf("60%04d", i%50) // 模拟50只股票
 			name := fmt.Sprintf("股票%d", i%50)
 			price := 10.0 + float64(i%100)*0.1 // 价格在10.0-19.9之间变动
 			volume := int64(1000000 + i*10000)
-			
+
 			stockData.SetFieldSafe("symbol", symbol)
 			stockData.SetFieldSafe("name", name)
 			stockData.SetFieldSafe("price", price)
@@ -234,7 +234,7 @@ func dataPipelineExample() {
 			stockData.SetFieldSafe("timestamp", time.Now().Add(time.Duration(i)*time.Millisecond))
 
 			dataChannel <- stockData
-			
+
 			// 模拟数据流延迟
 			time.Sleep(10 * time.Millisecond)
 		}
@@ -243,16 +243,16 @@ func dataPipelineExample() {
 	// 启动数据处理goroutine
 	go func() {
 		defer close(errorChannel)
-		
+
 		for stockData := range dataChannel {
 			// 数据预处理：添加计算字段
 			price, _ := stockData.GetField("price")
 			volume, _ := stockData.GetField("volume")
-			
+
 			// 计算成交额
 			turnover := price.(float64) * float64(volume.(int64))
 			stockData.SetFieldSafe("turnover", turnover)
-			
+
 			// 写入存储
 			if err := batchWriter.Write(ctx, stockData); err != nil {
 				errorChannel <- err
@@ -289,9 +289,9 @@ done:
 	// 统计处理结果
 	batchStats := batchWriter.GetStats()
 	processed = int(batchStats.StructuredDataRecords)
-	
+
 	fmt.Printf("数据流水线处理完成: 成功处理 %d 条记录, 错误 %d 条\n", processed, errors)
-	fmt.Printf("批量写入统计: 总批次 %d, 总刷新次数 %d\n", 
+	fmt.Printf("批量写入统计: 总批次 %d, 总刷新次数 %d\n",
 		batchStats.StructuredDataBatches, batchStats.StructuredDataFlushes)
 }
 
@@ -337,9 +337,9 @@ func performanceMonitoringExample() {
 
 	for _, cfg := range configs {
 		fmt.Printf("\n测试配置: %s\n", cfg.name)
-		
+
 		ms := storage.NewMemoryStorage(cfg.config)
-		
+
 		// 准备测试数据
 		testData := make([]*subscriber.StructuredData, 500)
 		for i := 0; i < 500; i++ {
@@ -354,23 +354,23 @@ func performanceMonitoringExample() {
 
 		// 测试批量保存性能
 		start := time.Now()
-		
+
 		var dataList []interface{}
 		for _, data := range testData {
 			dataList = append(dataList, data)
 		}
-		
+
 		err := ms.BatchSave(ctx, dataList)
 		if err != nil {
 			log.Printf("批量保存失败: %v", err)
 			continue
 		}
-		
+
 		saveTime := time.Since(start)
 
 		// 测试查询性能
 		start = time.Now()
-		
+
 		// 查询测试
 		queryCount := 50
 		for i := 0; i < queryCount; i++ {
@@ -382,17 +382,17 @@ func performanceMonitoringExample() {
 			}
 			_ = results // 使用结果
 		}
-		
+
 		queryTime := time.Since(start)
 
 		// 获取统计信息
 		stats := ms.GetStats()
-		
-		fmt.Printf("  保存性能: %d 条记录耗时 %v (%.2f 条/秒)\n", 
+
+		fmt.Printf("  保存性能: %d 条记录耗时 %v (%.2f 条/秒)\n",
 			len(testData), saveTime, float64(len(testData))/saveTime.Seconds())
-		fmt.Printf("  查询性能: %d 次查询耗时 %v (%.2f 查询/秒)\n", 
+		fmt.Printf("  查询性能: %d 次查询耗时 %v (%.2f 查询/秒)\n",
 			queryCount, queryTime, float64(queryCount)/queryTime.Seconds())
-		fmt.Printf("  存储统计: 记录数=%d, 表数=%d, 索引数=%d\n", 
+		fmt.Printf("  存储统计: 记录数=%d, 表数=%d, 索引数=%d\n",
 			stats.TotalRecords, stats.TotalTables, stats.IndexCount)
 
 		ms.Close()
@@ -471,7 +471,7 @@ func multiSchemaManagementExample() {
 
 	// 批量写入所有数据
 	fmt.Printf("写入多模式数据: 总计 %d 条记录\n", len(allData))
-	
+
 	for _, data := range allData {
 		if err := batchWriter.Write(ctx, data); err != nil {
 			log.Printf("写入失败: %v", err)
@@ -485,9 +485,9 @@ func multiSchemaManagementExample() {
 	memStats := memStorage.GetStats()
 
 	fmt.Printf("多模式数据写入完成:\n")
-	fmt.Printf("  批量写入统计: 总记录=%d, StructuredData记录=%d\n", 
+	fmt.Printf("  批量写入统计: 总记录=%d, StructuredData记录=%d\n",
 		batchStats.TotalRecords, batchStats.StructuredDataRecords)
-	fmt.Printf("  内存存储统计: 总记录=%d, 总表数=%d\n", 
+	fmt.Printf("  内存存储统计: 总记录=%d, 总表数=%d\n",
 		memStats.TotalRecords, memStats.TotalTables)
 	fmt.Printf("  期望的表数量: %d (每个模式一个表)\n", len(schemas))
 }
@@ -509,7 +509,7 @@ func errorRecoveryExample() {
 		StructuredDataBatchSize:   5,
 		StructuredDataFlushDelay:  200 * time.Millisecond,
 	}
-	
+
 	batchWriter := storage.NewBatchWriter(memStorage, tolerantConfig)
 	defer batchWriter.Close()
 
@@ -520,18 +520,18 @@ func errorRecoveryExample() {
 		// 正常的 StructuredData
 		createValidStockData("600000", "正常股票1", 10.50),
 		createValidStockData("600001", "正常股票2", 12.80),
-		
+
 		// 异常的 StructuredData (缺少 schema)
 		&subscriber.StructuredData{
 			Schema:    nil, // 这会导致错误
 			Values:    map[string]interface{}{"symbol": "600002"},
 			Timestamp: time.Now(),
 		},
-		
+
 		// 更多正常数据
 		createValidStockData("600003", "正常股票3", 15.20),
 		createValidStockData("600004", "正常股票4", 8.90),
-		
+
 		// 普通数据（非StructuredData）
 		map[string]interface{}{
 			"type": "misc",
@@ -544,7 +544,7 @@ func errorRecoveryExample() {
 	errorCount := 0
 
 	fmt.Println("开始容错写入测试...")
-	
+
 	for i, data := range testData {
 		err := batchWriter.Write(ctx, data)
 		if err != nil {

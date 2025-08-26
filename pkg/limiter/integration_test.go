@@ -33,9 +33,9 @@ func (e *MockError) Error() string {
 
 // MockDataProvider 模拟数据提供者
 type MockDataProvider struct {
-	mockResponses  map[string][]string
-	mockErrors     map[string]error
-	requestCount   int
+	mockResponses map[string][]string
+	mockErrors    map[string]error
+	requestCount  int
 }
 
 func NewMockDataProvider() *MockDataProvider {

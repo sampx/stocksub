@@ -8,9 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"stocksub/pkg/provider/tencent"
 	"stocksub/pkg/testkit/storage"
+	"strings"
 	"testing"
 	"time"
 

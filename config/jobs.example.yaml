@@ -1,0 +1,114 @@
+# StockSub 任务配置示例
+# 此文件展示了 Provider Node 支持的任务配置格式
+
+jobs:
+  # 实时股票数据采集任务
+  - name: "realtime-stock-ashare-main"
+    enabled: true
+    schedule: "*/3 * 9-11,13-14 * * 1-5"  # 每3秒，交易时段（周一至周五）
+    provider:
+      name: "tencent"
+      type: "RealtimeStock"
+    params:
+      symbols: ["600000", "000001", "601398", "000858"]
+      batch_size: 10
+    output:
+      stream: "stream:stock:realtime"
+      metadata:
+        market: "A-share"
+        category: "main-board"
+
+  # STAR 市场股票数据
+  - name: "realtime-stock-star-market"
+    enabled: true
+    schedule: "*/5 * 9-11,13-14 * * 1-5"
+    provider:
+      name: "tencent"
+      type: "RealtimeStock"
+    params:
+      symbols: ["688036", "688599", "688041"]
+    output:
+      stream: "stream:stock:realtime"
+      metadata:
+        market: "A-share"
+        category: "star-market"
+
+  # 指数数据采集
+  - name: "realtime-index-main"
+    enabled: true
+    schedule: "*/10 * 9-11,13-14 * * 1-5"
+    provider:
+      name: "tencent"
+      type: "RealtimeIndex"
+    params:
+      index_symbols: ["000001", "399001", "399006"]
+    output:
+      stream: "stream:index:realtime"
+      metadata:
+        market: "A-share"
+        type: "index"
+
+  # 历史数据每日采集（收盘后）
+  - name: "daily-history-all"
+    enabled: true
+    schedule: "0 16 * * 1-5"  # 每天16:00
+    provider:
+      name: "some-vendor"
+      type: "Historical"
+    params:
+      target: "all_market_stocks"
+      period: "1d"
+    output:
+      stream: "stream:stock:historical"
+      metadata:
+        period: "daily"
+        type: "historical"
+
+  # 长期监控任务（兼容现有 api_monitor 功能）
+  - name: "long-term-monitoring"
+    enabled: true
+    schedule: "*/3 * 9-11,13-14 * * 1-5"
+    provider:
+      name: "tencent"
+      type: "RealtimeStock"
+    params:
+      symbols: ["600000", "000001"]
+      duration: "24h"
+      analysis: true
+    output:
+      type: "csv"
+      directory: "./collected_data"
+      stream: "stream:stock:realtime"
+
+# 装饰器配置（策略层）
+decorators:
+  frequency_control:
+    enabled: true
+    min_interval: "200ms"
+    max_requests_per_minute: 300
+    trading_hours_only: true
+
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5
+    success_threshold: 3
+    timeout: "30s"
+    half_open_max_requests: 2
+
+  caching:
+    enabled: true
+    ttl: "5m"
+    max_size: 1000
+
+# Redis 连接配置
+redis:
+  url: "redis://:password@localhost:6379/0"
+  stream_prefix: "stream:"
+  consumer_group: "stocksub-consumers"
+
+# 监控和指标配置
+monitoring:
+  enabled: true
+  prometheus_port: 9090
+  metrics_prefix: "stocksub_"
+  health_check_interval: "30s"

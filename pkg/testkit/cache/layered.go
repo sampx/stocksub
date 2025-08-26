@@ -32,7 +32,7 @@ type LayerFactory interface {
 // LayerConfig 缓存层配置
 type LayerConfig struct {
 	Type            LayerType     `yaml:"type"`
-	Path            string        `yaml:"path"`           // 缓存路径（主要用于磁盘缓存）
+	Path            string        `yaml:"path"` // 缓存路径（主要用于磁盘缓存）
 	MaxSize         int64         `yaml:"max_size"`
 	TTL             time.Duration `yaml:"ttl"`
 	Enabled         bool          `yaml:"enabled"`
@@ -61,11 +61,11 @@ type LayeredCache struct {
 
 // promoteRequest 数据提升请求
 type promoteRequest struct {
-	ctx        context.Context
-	key        string
-	value      interface{}
-	fromLayer  int
-	errChan    chan error
+	ctx       context.Context
+	key       string
+	value     interface{}
+	fromLayer int
+	errChan   chan error
 }
 
 // LayeredCacheStats 分层缓存统计
@@ -86,13 +86,13 @@ func NewLayeredCache(config LayeredCacheConfig) (*LayeredCache, error) {
 // NewLayeredCacheWithFactories 使用指定的工厂创建分层缓存
 func NewLayeredCacheWithFactories(config LayeredCacheConfig, customFactories map[LayerType]LayerFactory) (*LayeredCache, error) {
 	layers := make([]core.Cache, 0, len(config.Layers))
-	
+
 	// 初始化默认工厂注册表
 	factories := make(map[LayerType]LayerFactory)
 	for layerType, factory := range customFactories {
 		factories[layerType] = factory
 	}
-	
+
 	// 注册默认工厂
 	registerDefaultFactories(factories)
 
@@ -122,7 +122,7 @@ func NewLayeredCacheWithFactories(config LayeredCacheConfig, customFactories map
 		},
 		promoteChan: make(chan promoteRequest, 100), // 缓冲通道避免阻塞
 	}
-	
+
 	// 启动数据提升工作协程
 	if config.PromoteEnabled {
 		go lc.promoteWorker()
@@ -165,7 +165,7 @@ func (lc *LayeredCache) Get(ctx context.Context, key string) (interface{}, error
 		return nil, fmt.Errorf("缓存已关闭")
 	}
 	lc.mu.RUnlock()
-	
+
 	for i, layer := range lc.layers {
 		value, err := layer.Get(ctx, key)
 		if err == nil {
@@ -199,7 +199,7 @@ func (lc *LayeredCache) getLayerType(index int) string {
 	if index < 0 || index >= len(lc.config.Layers) {
 		return "unknown"
 	}
-	
+
 	// 从配置中获取层类型
 	return string(lc.config.Layers[index].Type)
 }
@@ -243,7 +243,7 @@ func (lc *LayeredCache) Set(ctx context.Context, key string, value interface{}, 
 		return fmt.Errorf("缓存已关闭")
 	}
 	lc.mu.RUnlock()
-	
+
 	if lc.config.WriteThrough {
 		// 写穿透：向所有层写入
 		var lastErr error
@@ -277,7 +277,7 @@ func (lc *LayeredCache) Delete(ctx context.Context, key string) error {
 		return fmt.Errorf("缓存已关闭")
 	}
 	lc.mu.RUnlock()
-	
+
 	var lastErr error
 
 	// 从所有层删除
@@ -299,7 +299,7 @@ func (lc *LayeredCache) Clear(ctx context.Context) error {
 		return fmt.Errorf("缓存已关闭")
 	}
 	lc.mu.RUnlock()
-	
+
 	var lastErr error
 
 	for i, layer := range lc.layers {
@@ -321,7 +321,7 @@ func (lc *LayeredCache) Clear(ctx context.Context) error {
 func (lc *LayeredCache) Stats() core.CacheStats {
 	lc.mu.RLock()
 	defer lc.mu.RUnlock()
-	
+
 	// 即使缓存已关闭，也允许获取统计信息
 
 	// 收集各层统计信息
@@ -370,7 +370,7 @@ func (lc *LayeredCache) promoteToUpperLayers(ctx context.Context, key string, va
 func (lc *LayeredCache) GetLayerStats() LayeredCacheStats {
 	lc.mu.RLock()
 	defer lc.mu.RUnlock()
-	
+
 	// 即使缓存已关闭，也允许获取统计信息
 
 	// 更新各层统计信息
@@ -385,7 +385,7 @@ func (lc *LayeredCache) GetLayerStats() LayeredCacheStats {
 func (lc *LayeredCache) Close() error {
 	lc.mu.Lock()
 	defer lc.mu.Unlock()
-	
+
 	if lc.closed {
 		return nil // 已经关闭
 	}
@@ -417,7 +417,7 @@ func (lc *LayeredCache) BatchGet(ctx context.Context, keys []string) (map[string
 		return nil, fmt.Errorf("缓存已关闭")
 	}
 	lc.mu.RUnlock()
-	
+
 	result := make(map[string]any)
 	remainingKeys := make([]string, len(keys))
 	copy(remainingKeys, keys)
@@ -440,7 +440,7 @@ func (lc *LayeredCache) BatchGet(ctx context.Context, keys []string) (map[string
 				result[key] = value
 				// 从剩余键中移除已找到的键
 				remainingKeys = removeKey(remainingKeys, key)
-				
+
 				// 检查是否需要数据提升
 				if lc.config.PromoteEnabled && i > 0 {
 					lc.asyncPromoteToUpperLayers(ctx, key, value, i)
@@ -454,7 +454,7 @@ func (lc *LayeredCache) BatchGet(ctx context.Context, keys []string) (map[string
 					result[key] = value
 					// 从剩余键中移除已找到的键
 					remainingKeys = removeKey(remainingKeys, key)
-					
+
 					// 检查是否需要数据提升
 					if lc.config.PromoteEnabled && i > 0 {
 						lc.asyncPromoteToUpperLayers(ctx, key, value, i)
@@ -485,7 +485,7 @@ func (lc *LayeredCache) BatchSet(ctx context.Context, items map[string]any, ttl 
 		return fmt.Errorf("缓存已关闭")
 	}
 	lc.mu.RUnlock()
-	
+
 	if lc.config.WriteThrough {
 		// 写穿透：向所有层写入
 		var lastErr error
@@ -550,7 +550,7 @@ func (lc *LayeredCache) Warm(ctx context.Context, data map[string]interface{}) e
 		return fmt.Errorf("缓存已关闭")
 	}
 	lc.mu.RUnlock()
-	
+
 	for key, value := range data {
 		if err := lc.Set(ctx, key, value, 0); err != nil {
 			return fmt.Errorf("预热缓存失败，key=%s: %w", key, err)
@@ -567,7 +567,7 @@ func (lc *LayeredCache) Flush(ctx context.Context) error {
 		return fmt.Errorf("缓存已关闭")
 	}
 	lc.mu.RUnlock()
-	
+
 	if !lc.config.WriteBack {
 		return nil // 只在写回模式下执行刷新
 	}
@@ -665,15 +665,15 @@ func (f *remoteLayerFactory) LayerType() LayerType {
 
 func (f *remoteLayerFactory) CreateLayer(config LayerConfig, layerIndex int) (core.Cache, error) {
 	remoteConfig := RemoteCacheConfig{
-		Address:         "localhost:6379", // 默认Redis地址
-		MaxSize:         config.MaxSize,
-		DefaultTTL:      config.TTL,
-		ConnectTimeout:  5 * time.Second,
-		RequestTimeout:  2 * time.Second,
-		MaxConnections:  10,
-		PoolSize:        5,
+		Address:        "localhost:6379", // 默认Redis地址
+		MaxSize:        config.MaxSize,
+		DefaultTTL:     config.TTL,
+		ConnectTimeout: 5 * time.Second,
+		RequestTimeout: 2 * time.Second,
+		MaxConnections: 10,
+		PoolSize:       5,
 	}
-	
+
 	// 使用模拟实现，实际项目中应该根据配置选择具体的远程缓存类型
 	return NewMockRemoteCache(remoteConfig), nil
 }

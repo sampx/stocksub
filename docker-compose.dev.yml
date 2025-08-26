@@ -1,0 +1,90 @@
+
+services:
+  # 基础服务（与生产环境一致）
+  redis:
+    image: redis:7-alpine
+    container_name: stocksub-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_dev:/data
+    command: redis-server --appendonly yes --requirepass dev_redis_pass
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "dev_redis_pass", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - stocksub-dev-network
+
+  influxdb:
+    image: influxdb:2.7
+    container_name: stocksub-influxdb-dev
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=dev_admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=dev_influx_pass
+      - DOCKER_INFLUXDB_INIT_ORG=stocksub_dev
+      - DOCKER_INFLUXDB_INIT_BUCKET=stocksub_data_dev
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=dev_influx_token
+    volumes:
+      - influxdb_data_dev:/var/lib/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - stocksub-dev-network
+
+  # 开发工具
+  # redis-commander:
+  #   image: rediscommander/redis-commander:latest
+  #   container_name: stocksub-redis-commander-dev
+  #   ports:
+  #     - "8081:8081"
+  #   environment:
+  #     - REDIS_HOSTS=local:redis:6379:0:dev_redis_pass
+  #   depends_on:
+  #     - redis
+  #   restart: unless-stopped
+  #   networks:
+  #     - stocksub-dev-network
+
+  # 数据生成器（用于测试）- 暂时禁用，存在编译问题
+  # data-generator:
+  #   image: golang:1.23-alpine
+  #   container_name: stocksub-data-generator-dev
+  #   environment:
+  #     - REDIS_URL=redis://:dev_redis_pass@redis:6379/0
+  #     - INFLUXDB_URL=http://influxdb:8086
+  #     - INFLUXDB_TOKEN=dev_influx_token
+  #   depends_on:
+  #     - redis
+  #     - influxdb
+  #   volumes:
+  #     - .:/app
+  #     - go-mod-cache:/go/pkg/mod
+  #   working_dir: /app
+  #   command: ["go", "run", "./cmd/api_monitor", "-symbols=600000,000001", "-duration=24h", "-interval=5s", "-cleanup=false"]
+  #   restart: unless-stopped
+  #   networks:
+  #     - stocksub-dev-network
+
+volumes:
+  redis_data_dev:
+    driver: local
+  influxdb_data_dev:
+    driver: local
+  go-mod-cache:
+    driver: local
+
+networks:
+  stocksub-dev-network:
+    driver: bridge
+    name: stocksub-dev-network

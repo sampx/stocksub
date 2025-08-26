@@ -1,4 +1,3 @@
-
 package testkit_test
 
 import (
@@ -9,7 +8,7 @@ import (
 	"stocksub/pkg/testkit"
 	"stocksub/pkg/testkit/cache"
 	"stocksub/pkg/testkit/config"
-	
+
 	"stocksub/pkg/testkit/storage"
 	"testing"
 	"time"
@@ -114,7 +113,7 @@ func BenchmarkCSVStorage_WriteOperations_SingleAndBatch(b *testing.B) {
 		ctx := context.Background()
 
 		b.ResetTimer()
-        b.ReportAllocs()
+		b.ReportAllocs()
 
 		for i := 0; i < b.N; i++ {
 			if err := storage.BatchSave(ctx, batchData); err != nil {

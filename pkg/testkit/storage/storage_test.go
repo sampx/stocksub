@@ -52,7 +52,7 @@ func TestCSVStorage_Save_WithSingleItem_CreatesFile(t *testing.T) {
 
 	// 验证文件是否创建
 	storage.Flush() // 确保写入
-	expectedFile := filepath.Join(tmpDir, "test_stock_data_"+time.Now().Format("2006-01-02")+ ".csv")
+	expectedFile := filepath.Join(tmpDir, "test_stock_data_"+time.Now().Format("2006-01-02")+".csv")
 	_, err = os.Stat(expectedFile)
 	assert.NoError(t, err, "CSV file should be created")
 
@@ -83,9 +83,9 @@ func TestCSVStorage_BatchSave_WithMultipleItems_SavesAll(t *testing.T) {
 	dataList := make([]interface{}, 10)
 	for i := 0; i < 10; i++ {
 		dataList[i] = subscriber.StockData{
-			Symbol: fmt.Sprintf("TEST%03d", i),
-			Name:   fmt.Sprintf("测试股票%d", i),
-			Price:  100.0 + float64(i),
+			Symbol:    fmt.Sprintf("TEST%03d", i),
+			Name:      fmt.Sprintf("测试股票%d", i),
+			Price:     100.0 + float64(i),
 			Timestamp: time.Now(),
 		}
 	}
@@ -158,7 +158,6 @@ func TestMemoryStorage_Save_WithMaxRecords_EvictsOldest(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, results, 3)
 }
-
 
 // --- Migrated from integration_test.go ---
 
@@ -448,7 +447,6 @@ func TestMemoryStorage_GetStats_AfterSaves_ReturnsCorrectCounts(t *testing.T) {
 	assert.GreaterOrEqual(t, stats.TotalTables, 1)
 	assert.GreaterOrEqual(t, stats.IndexCount, 1)
 }
-
 
 func TestMemoryStorage_Save_WithTTL_EvictsExpired(t *testing.T) {
 	// 使用较短的TTL进行测试

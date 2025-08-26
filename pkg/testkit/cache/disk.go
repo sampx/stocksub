@@ -104,7 +104,7 @@ func (dc *DiskCache) Get(ctx context.Context, key string) (interface{}, error) {
 		dc.stats.MissCount++
 		dc.stats.Size--
 		dc.mu.Unlock()
-		
+
 		// 异步删除磁盘文件
 		go os.Remove(entry.Filepath)
 		return nil, core.NewTestKitError(core.ErrCacheMiss, "cache expired")
@@ -142,7 +142,7 @@ func (dc *DiskCache) Set(ctx context.Context, key string, value interface{}, ttl
 	}
 
 	expireTime := time.Now().Add(ttl)
-	
+
 	// 序列化数据
 	dataBytes, err := json.Marshal(value)
 	if err != nil {
@@ -298,7 +298,7 @@ func (dc *DiskCache) readFromDisk(filepath string) (interface{}, error) {
 // writeToDisk 向磁盘写入数据
 func (dc *DiskCache) writeToDisk(filepath string, data []byte) error {
 	tempFile := filepath + ".tmp"
-	
+
 	if err := os.WriteFile(tempFile, data, 0644); err != nil {
 		return fmt.Errorf("写入临时文件失败: %w", err)
 	}

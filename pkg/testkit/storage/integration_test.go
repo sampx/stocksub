@@ -26,7 +26,7 @@ func TestCSVStorage_SaveAndLoad_Integration(t *testing.T) {
 	ctx := context.Background()
 	testData := subscriber.StockData{
 		Symbol:    "600000",
-		Name:      "浦发银行", 
+		Name:      "浦发银行",
 		Price:     8.45,
 		Change:    0.15,
 		Timestamp: time.Now(),
@@ -41,7 +41,7 @@ func TestCSVStorage_SaveAndLoad_Integration(t *testing.T) {
 		subscriber.StockData{Symbol: "000001", Name: "平安银行", Price: 12.30},
 		subscriber.StockData{Symbol: "600036", Name: "招商银行", Price: 32.15},
 	}
-	
+
 	err = csvStorage.BatchSave(ctx, batchData)
 	assert.NoError(t, err, "批量保存失败")
 
@@ -74,7 +74,7 @@ func TestMemoryStorage_ConcurrentAccess_Integration(t *testing.T) {
 					Price:  10.0 + float64(i),
 					Name:   "测试股票" + symbol,
 				}
-				
+
 				err := memStorage.Save(ctx, data)
 				assert.NoError(t, err, "并发保存失败")
 			})
@@ -102,7 +102,7 @@ func TestStorage_InterfaceCompliance_Integration(t *testing.T) {
 
 	var _ core.Storage = csvStorage
 
-	// 验证MemoryStorage实现接口  
+	// 验证MemoryStorage实现接口
 	memConfig := storage.MemoryStorageConfig{
 		MaxRecords:      1000,
 		EnableIndex:     true,

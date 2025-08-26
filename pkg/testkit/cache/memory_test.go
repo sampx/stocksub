@@ -1,9 +1,8 @@
-
 package cache
 
 import (
 	"context"
-	
+
 	"stocksub/pkg/testkit/core"
 	"testing"
 	"time"
@@ -205,11 +204,9 @@ func TestMemoryCache_Set_WithMaxSize_EvictsOldestEntry(t *testing.T) {
 func TestMemoryCache_EstimateSize_WithVariousTypes_ReturnsCorrectSize(t *testing.T) {
 	assert.Equal(t, int64(5), estimateSize("hello"))
 	assert.Equal(t, int64(10), estimateSize([]byte("0123456789")))
-	assert.Equal(t, int64(64), estimateSize(12345)) // default case
+	assert.Equal(t, int64(64), estimateSize(12345))      // default case
 	assert.Equal(t, int64(64), estimateSize(struct{}{})) // default case
 }
-
-
 
 // TestMemoryCache_Cleanup_WithExpiredEntries_RemovesExpiredItems 测试MemoryCache的cleanup方法
 func TestMemoryCache_Cleanup_WithExpiredEntries_RemovesExpiredItems(t *testing.T) {

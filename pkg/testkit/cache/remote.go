@@ -1,4 +1,3 @@
-
 package cache
 
 import (
@@ -12,13 +11,13 @@ import (
 
 // RemoteCacheConfig 远程缓存配置
 type RemoteCacheConfig struct {
-	Address         string        `yaml:"address"`          // 远程服务器地址
-	MaxSize         int64         `yaml:"max_size"`         // 最大缓存条目数（客户端限制）
-	DefaultTTL      time.Duration `yaml:"default_ttl"`      // 默认生存时间
-	ConnectTimeout  time.Duration `yaml:"connect_timeout"`  // 连接超时
-	RequestTimeout  time.Duration `yaml:"request_timeout"`  // 请求超时
-	MaxConnections  int           `yaml:"max_connections"`  // 最大连接数
-	PoolSize        int           `yaml:"pool_size"`        // 连接池大小
+	Address        string        `yaml:"address"`         // 远程服务器地址
+	MaxSize        int64         `yaml:"max_size"`        // 最大缓存条目数（客户端限制）
+	DefaultTTL     time.Duration `yaml:"default_ttl"`     // 默认生存时间
+	ConnectTimeout time.Duration `yaml:"connect_timeout"` // 连接超时
+	RequestTimeout time.Duration `yaml:"request_timeout"` // 请求超时
+	MaxConnections int           `yaml:"max_connections"` // 最大连接数
+	PoolSize       int           `yaml:"pool_size"`       // 连接池大小
 }
 
 // RemoteCache 远程缓存接口

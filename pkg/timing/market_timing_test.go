@@ -210,7 +210,7 @@ type MarketTimeTestHelper struct {
 func NewMarketTimeTestHelper(initialTime time.Time) *MarketTimeTestHelper {
 	mockService := &MockTimeService{current: initialTime}
 	marketTime := NewMarketTime(mockService)
-	
+
 	return &MarketTimeTestHelper{
 		TimeService: mockService,
 		MarketTime:  marketTime,
@@ -230,7 +230,7 @@ func (h *MarketTimeTestHelper) IsInTradingWindow() bool {
 // TestMarketTimeScenarios 标准的市场时间测试场景套件
 func TestMarketTimeScenarios(t *testing.T) {
 	location := time.FixedZone("CST", 8*3600)
-	
+
 	testScenarios := []struct {
 		description    string
 		testTime       string
@@ -277,14 +277,14 @@ func TestMarketTimeScenarios(t *testing.T) {
 			expectedResult: false,
 		},
 	}
-	
+
 	for _, scenario := range testScenarios {
 		t.Run(scenario.description, func(t *testing.T) {
 			testTime, _ := time.ParseInLocation("2006-01-02 15:04:05", scenario.testTime, location)
-			
+
 			helper := NewMarketTimeTestHelper(testTime)
 			result := helper.IsInTradingWindow()
-			
+
 			assert.Equal(t, scenario.expectedResult, result, scenario.description)
 		})
 	}
@@ -294,10 +294,10 @@ func TestMarketTimeScenarios(t *testing.T) {
 func SimulateFullTradingDay(t *testing.T) {
 	location := time.FixedZone("CST", 8*3600)
 	_ = time.Date(2025, 8, 21, 8, 30, 0, 0, location) // 上午8:30开始
-	
+
 	timeline := []struct {
-		timeString string
-		description string
+		timeString      string
+		description     string
 		shouldBeTrading bool
 	}{
 		{"08:30:00", "开盘前准备 - 市场尚未开始", false},
@@ -310,14 +310,14 @@ func SimulateFullTradingDay(t *testing.T) {
 		{"15:00:10", "交易结束 - 停止API调用", false},
 		{"15:01:00", "盘后清理期 - 完全停止", false},
 	}
-	
+
 	for _, event := range timeline {
 		t.Run(event.description, func(t *testing.T) {
 			testTime, _ := time.ParseInLocation("2006-01-02 15:04:05", "2025-08-21 "+event.timeString, location)
-			
+
 			helper := NewMarketTimeTestHelper(testTime)
 			trading := helper.IsInTradingWindow()
-			
+
 			assert.Equal(t, event.shouldBeTrading, trading, event.description)
 		})
 	}
