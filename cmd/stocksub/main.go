@@ -10,6 +10,7 @@ import (
 	"stocksub/pkg/config"
 	"stocksub/pkg/logger"
 	"stocksub/pkg/provider"
+	"stocksub/pkg/provider/decorators"
 	"stocksub/pkg/provider/tencent"
 	"stocksub/pkg/subscriber"
 
@@ -41,11 +42,33 @@ func main() {
 	// 创建腾讯数据提供商
 	tencentProvider := tencent.NewProvider()
 
-	// 注册提供商到管理器
-	err := providerManager.RegisterProvider("tencent", tencentProvider)
+	// 应用装饰器增强功能
+	log.Infof("应用装饰器增强...")
+	decoratorConfig := decorators.DefaultDecoratorConfig() // 使用默认装饰器配置
+	decoratedProvider, decoratorErr := decorators.CreateDecoratedProvider(tencentProvider, decoratorConfig)
+	if decoratorErr != nil {
+		log.Warnf("装饰器创建失败，回退到原始提供商: %v", decoratorErr)
+		decoratedProvider = tencentProvider // 回退
+	} else {
+		log.Infof("装饰器应用成功: %s", decoratedProvider.Name())
+		
+		// 输出装饰器状态信息
+		if statusProvider, ok := decoratedProvider.(interface{ GetStatus() map[string]interface{} }); ok {
+			status := statusProvider.GetStatus()
+			log.Infof("装饰器状态: 类型=%v, 启用=%v", status["decorator_type"], status["enabled"])
+		}
+	}
+
+	// 注册增强后的提供商到管理器
+	err := providerManager.RegisterProvider("tencent", decoratedProvider)
 	if err != nil {
-		log.Errorf("Failed to register tencent provider: %v", err)
-		os.Exit(1)
+		log.Errorf("Failed to register decorated provider: %v", err)
+		// 尝试注册原始提供商作为后备
+		log.Warnf("尝试注册原始提供商作为后备...")
+		if fallbackErr := providerManager.RegisterProvider("tencent", tencentProvider); fallbackErr != nil {
+			log.Errorf("Failed to register fallback provider: %v", fallbackErr)
+			os.Exit(1)
+		}
 	}
 
 	// 获取实时股票数据提供商 (通过新接口)
