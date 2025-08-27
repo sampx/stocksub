@@ -27,8 +27,14 @@ func Default() {
 	fmt.Println("  mage testUnit    - 运行单元测试")
 	fmt.Println("  mage testIntegration - 运行集成测试")
 	fmt.Println("  mage benchmark   - 运行性能基准测试")
-	fmt.Println("  mage servicesUp  - 启动依赖服务 (Redis + InfluxDB)")
-	fmt.Println("  mage servicesDown - 停止依赖服务")
+	fmt.Println("  mage docker:up  - 启动基础环境 (Redis + InfluxDB)")
+	fmt.Println("  mage docker:upAll - 启动所有服务")
+	fmt.Println("  mage docker:upApps - 启动所有应用服务")
+	fmt.Println("  mage docker:upProvider - 启动数据提供节点")
+	fmt.Println("  mage docker:upRedisCollector - 启动 Redis 收集器")
+	fmt.Println("  mage docker:upInfluxCollector - 启动 InfluxDB 收集器")
+	fmt.Println("  mage docker:upApiServer - 启动 API 服务器")
+	fmt.Println("  mage docker:down - 停止所有服务")
 	fmt.Println("  mage clean       - 清理构建产物")
 	fmt.Println("  mage lint        - 运行代码检查")
 	fmt.Println("  mage coverage    - 生成测试覆盖率报告")
@@ -163,45 +169,72 @@ func Benchmark() error {
 	return nil
 }
 
-type Services mg.Namespace
+type Docker mg.Namespace
 
-// Up 启动依赖服务 (Redis + InfluxDB)
-func (Services) Up() error {
-	fmt.Println("🐳 启动依赖服务...")
-
-	// 使用开发环境配置
-	if err := sh.Run("docker-compose", "-f", "docker-compose.dev.yml", "-p", "stocksub-dev", "up", "-d"); err != nil {
-		return fmt.Errorf("启动服务失败: %v", err)
-	}
-
-	fmt.Println("⏳ 等待服务就绪...")
-	time.Sleep(5 * time.Second)
-
-	// 检查服务状态
-	if isRedisRunning() {
-		fmt.Println("✅ Redis 服务已启动")
-	} else {
-		fmt.Println("❌ Redis 服务启动失败")
-	}
-
-	fmt.Println("🎉 所有依赖服务已启动!")
-	fmt.Println("   Redis: localhost:6379")
-	fmt.Println("   InfluxDB: localhost:8086")
-	fmt.Println("   Redis Commander: localhost:8081")
-
-	return nil
+// Build 构建所有在 docker-compose.dev.yml 中定义的服务镜像
+func (Docker) Build() error {
+	fmt.Println("🐳 构建所有 Docker 镜像...")
+	return sh.RunV("docker-compose", "-f", "docker-compose.dev.yml", "-p", "stocksub-dev", "build")
 }
 
-// Down 停止依赖服务
-func (Services) Down() error {
-	fmt.Println("🛑 停止依赖服务...")
+// Up 启动基础环境服务 (redis, influxdb)
+func (Docker) Env() error {
+	fmt.Println("🚀 启动基础环境服务 (redis, influxdb)...")
+	return sh.RunV("docker-compose", "-f", "docker-compose.dev.yml", "-p", "stocksub-dev", "up", "-d", "redis", "influxdb")
+}
 
-	if err := sh.Run("docker-compose", "-f", "docker-compose.dev.yml", "-p", "stocksub-dev", "down"); err != nil {
-		return fmt.Errorf("停止服务失败: %v", err)
-	}
+// UpAll 启动所有服务（基础环境 + 应用服务）
+func (Docker) UpAll() error {
+	fmt.Println("🚀 启动所有服务...")
+	return sh.RunV("docker-compose", "-f", "docker-compose.dev.yml", "-p", "stocksub-dev", "up", "-d", "--build")
+}
 
-	fmt.Println("✅ 所有依赖服务已停止!")
-	return nil
+// UpProvider 启动数据提供节点
+func (Docker) Provider() error {
+	fmt.Println("🚀 启动数据提供节点...")
+	return sh.RunV("docker-compose", "-f", "docker-compose.dev.yml", "-p", "stocksub-dev", "up", "-d", "--build", "provider-node")
+}
+
+// UpRedisCollector 启动 Redis 收集器
+func (Docker) RedisCollector() error {
+	fmt.Println("🚀 启动 Redis 收集器...")
+	return sh.RunV("docker-compose", "-f", "docker-compose.dev.yml", "-p", "stocksub-dev", "up", "-d", "--build", "redis-collector")
+}
+
+// UpInfluxCollector 启动 InfluxDB 收集器
+func (Docker) InfluxCollector() error {
+	fmt.Println("🚀 启动 InfluxDB 收集器...")
+	return sh.RunV("docker-compose", "-f", "docker-compose.dev.yml", "-p", "stocksub-dev", "up", "-d", "--build", "influxdb-collector")
+}
+
+// UpApiServer 启动 API 服务器
+func (Docker) ApiServer() error {
+	fmt.Println("🚀 启动 API 服务器...")
+	return sh.RunV("docker-compose", "-f", "docker-compose.dev.yml", "-p", "stocksub-dev", "up", "-d", "--build", "api-server")
+}
+
+// UpApps 启动所有应用服务（不包括基础环境）
+func (Docker) UpApps() error {
+	fmt.Println("🚀 启动所有应用服务...")
+	return sh.RunV("docker-compose", "-f", "docker-compose.dev.yml", "-p", "stocksub-dev", "up", "-d", "--build", "provider-node", "redis-collector", "influxdb-collector", "api-server")
+}
+
+// Down 停止所有开发环境服务
+func (Docker) Down() error {
+	fmt.Println("🛑 停止所有开发环境服务...")
+	return sh.RunV("docker-compose", "-f", "docker-compose.dev.yml", "-p", "stocksub-dev", "down")
+}
+
+// Status 查看所有服务的当前状态
+func (Docker) Status() error {
+	fmt.Println("📊 查看服务状态...")
+	return sh.RunV("docker-compose", "-f", "docker-compose.dev.yml", "-p", "stocksub-dev", "ps")
+}
+
+// Logs 查看所有服务的日志
+func (Docker) Logs() error {
+	fmt.Println("📜 查看服务日志...")
+	return sh.RunV("docker-compose", "-f", "docker-compose.dev.yml", "-p", "stocksub-dev", "logs", "-f", "--tail=100")
 }
 
 // Clean 清理构建产物

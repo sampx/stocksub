@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -20,6 +21,16 @@ import (
 
 	"stocksub/pkg/testkit/cache"
 	"stocksub/pkg/testkit/core"
+)
+
+var (
+	logLevel    = flag.String("log-level", "info", "日志级别 (debug, info, warn, error)")
+	logFormat   = flag.String("log-format", "json", "日志格式 (json or text)")
+	configPath  = flag.String("config", "", "配置文件路径 (例如 /app/config/api_server.yaml)")
+	redisAddr   = flag.String("redis", "", "Redis 地址，格式 host:port")
+	redisPass   = flag.String("redis-pass", "", "Redis 密码")
+	influxURL   = flag.String("influxdb-url", "", "InfluxDB URL")
+	influxToken = flag.String("influxdb-token", "", "InfluxDB token")
 )
 
 type APIServer struct {
@@ -103,8 +114,23 @@ type ErrorResponse struct {
 }
 
 func main() {
+	flag.Parse()
+
 	logger := logrus.New()
-	logger.SetLevel(logrus.InfoLevel)
+	level, err := logrus.ParseLevel(*logLevel)
+	if err != nil {
+		logger.Fatal("无效的日志级别")
+	}
+	logger.SetLevel(level)
+
+	switch *logFormat {
+	case "json":
+		logger.SetFormatter(&logrus.JSONFormatter{})
+	case "text":
+		logger.SetFormatter(&logrus.TextFormatter{})
+	default:
+		logger.Fatal("无效的日志格式")
+	}
 
 	// Load configuration
 	config, err := loadConfig()
@@ -137,10 +163,14 @@ func main() {
 }
 
 func loadConfig() (*Config, error) {
-	viper.SetConfigName("api_server")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath("./config")
-	viper.AddConfigPath(".")
+	if *configPath != "" {
+		viper.SetConfigFile(*configPath)
+	} else {
+		viper.SetConfigName("api_server")
+		viper.SetConfigType("yaml")
+		viper.AddConfigPath("./config")
+		viper.AddConfigPath(".")
+	}
 
 	// Set defaults
 	viper.SetDefault("server.port", "8080")
@@ -166,6 +196,20 @@ func loadConfig() (*Config, error) {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("failed to read config file: %w", err)
 		}
+	}
+
+	// Command-line flag overrides (when provided)
+	if *redisAddr != "" {
+		viper.Set("redis.addr", *redisAddr)
+	}
+	if *redisPass != "" {
+		viper.Set("redis.password", *redisPass)
+	}
+	if *influxURL != "" {
+		viper.Set("influxdb.url", *influxURL)
+	}
+	if *influxToken != "" {
+		viper.Set("influxdb.token", *influxToken)
 	}
 
 	var config Config

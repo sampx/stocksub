@@ -79,3 +79,16 @@ jobs:
     output:
       type: "redis_stream"
       stream: "stream:maintenance"
+
+  # 新浪数据源采集任务
+  - name: "fetch-realtime-stock-sina"
+    enabled: true
+    schedule: "*/10 * 9-11,13-14 * * 1-5"  # 每10秒，交易时段，工作日
+    provider:
+      name: "sina"
+      type: "RealtimeStock"
+    params:
+      symbols: ["600000", "000001", "300750"] # 浦发银行, 平安银行, 宁德时代
+    output:
+      type: "redis_stream"
+      stream: "stream:stock:realtime"

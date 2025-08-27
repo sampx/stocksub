@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -15,6 +16,11 @@ import (
 	"github.com/spf13/viper"
 
 	"stocksub/pkg/message"
+)
+
+var (
+	logLevel  = flag.String("log-level", "info", "日志级别 (debug, info, warn, error)")
+	logFormat = flag.String("log-format", "json", "日志格式 (json or text)")
 )
 
 type RedisCollector struct {
@@ -48,8 +54,23 @@ type Config struct {
 }
 
 func main() {
+	flag.Parse()
+
 	logger := logrus.New()
-	logger.SetLevel(logrus.InfoLevel)
+	level, err := logrus.ParseLevel(*logLevel)
+	if err != nil {
+		logger.Fatal("无效的日志级别")
+	}
+	logger.SetLevel(level)
+
+	switch *logFormat {
+	case "json":
+		logger.SetFormatter(&logrus.JSONFormatter{})
+	case "text":
+		logger.SetFormatter(&logrus.TextFormatter{})
+	default:
+		logger.Fatal("无效的日志格式")
+	}
 
 	// Load configuration
 	config, err := loadConfig()

@@ -13,6 +13,7 @@ import (
 	"stocksub/pkg/provider"
 	"stocksub/pkg/provider/core"
 	"stocksub/pkg/provider/decorators"
+	"stocksub/pkg/provider/sina"
 	"stocksub/pkg/provider/tencent"
 	"stocksub/pkg/scheduler"
 
@@ -26,6 +27,7 @@ var (
 	redisPass  = flag.String("redis-pass", "", "Redis 密码")
 	nodeID     = flag.String("node-id", "", "节点ID（默认自动生成）")
 	logLevel   = flag.String("log-level", "info", "日志级别")
+	logFormat  = flag.String("log-format", "json", "日志格式 (json 或 text)")
 )
 
 type ProviderNodeExecutor struct {
@@ -45,6 +47,16 @@ func main() {
 		logger.Fatal("无效的日志级别:", *logLevel)
 	}
 	logger.SetLevel(level)
+
+	// 设置日志格式
+	switch *logFormat {
+	case "json":
+		logger.SetFormatter(&logrus.JSONFormatter{})
+	case "text":
+		logger.SetFormatter(&logrus.TextFormatter{})
+	default:
+		logger.Fatal("无效的日志格式")
+	}
 
 	// 生成节点ID
 	if *nodeID == "" {
@@ -84,6 +96,17 @@ func main() {
 
 	if err := providerManager.RegisterRealtimeStockProvider("tencent", decoratedProvider); err != nil {
 		logger.WithError(err).Fatal("注册腾讯提供商失败")
+	}
+
+	// 注册新浪提供商
+	sinaProvider := sina.NewProvider()
+	decoratedSinaProvider, err := decorators.ApplyDefaultDecorators(sinaProvider)
+	if err != nil {
+		logger.WithError(err).Warn("应用新浪提供商装饰器失败，使用原始提供商")
+		decoratedSinaProvider = sinaProvider
+	}
+	if err := providerManager.RegisterRealtimeStockProvider("sina", decoratedSinaProvider); err != nil {
+		logger.WithError(err).Fatal("注册新浪提供商失败")
 	}
 
 	// 创建任务执行器

@@ -42,6 +42,87 @@ services:
     networks:
       - stocksub-dev-network
 
+  provider-node:
+    build:
+      context: .
+      dockerfile: ./cmd/provider_node/Dockerfile
+    container_name: stocksub-provider-node-dev
+    command: ["/app/provider_node", "--config", "/app/config/jobs.yaml", "--redis-pass", "dev_redis_pass", "--redis", "redis:6379", "--log-format", "json"]
+    volumes:
+      - ./config:/app/config
+      - ./_data:/app/_data
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - stocksub-dev-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis-collector:
+    build:
+      context: .
+      dockerfile: ./cmd/redis_collector/Dockerfile
+    container_name: stocksub-redis-collector-dev
+    command: ["/app/redis_collector", "--config", "/app/config/redis_collector.yaml", "--redis-pass", "dev_redis_pass", "--redis", "redis:6379", "--log-format", "json"]
+    volumes:
+      - ./config:/app/config
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - stocksub-dev-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  influxdb-collector:
+    build:
+      context: .
+      dockerfile: ./cmd/influxdb_collector/Dockerfile
+    container_name: stocksub-influxdb-collector-dev
+    command: ["/app/influxdb_collector", "--config", "/app/config/influxdb_collector.yaml", "--redis-pass", "dev_redis_pass", "--redis", "redis:6379", "--influxdb-token", "dev_influx_token", "--influxdb-url", "http://influxdb:8086", "--log-format", "json"]
+    volumes:
+      - ./config:/app/config
+    depends_on:
+      - redis
+      - influxdb
+    restart: unless-stopped
+    networks:
+      - stocksub-dev-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api-server:
+    build:
+      context: .
+      dockerfile: ./cmd/api_server/Dockerfile
+    container_name: stocksub-api-server-dev
+    ports:
+      - "8080:8080"
+    command: ["/app/api_server", "--config", "/app/config/api_server.yaml", "--redis-pass", "dev_redis_pass", "--redis", "redis:6379", "--influxdb-token", "dev_influx_token", "--influxdb-url", "http://influxdb:8086", "--log-format", "json"]
+    volumes:
+      - ./config:/app/config
+    depends_on:
+      - redis
+      - influxdb
+    restart: unless-stopped
+    networks:
+      - stocksub-dev-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # 开发工具
   # redis-commander:
   #   image: rediscommander/redis-commander:latest
