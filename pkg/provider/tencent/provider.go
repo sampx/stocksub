@@ -10,25 +10,17 @@ import (
 	"stocksub/pkg/provider/core"
 	"stocksub/pkg/subscriber"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
-// Provider 腾讯股票数据提供商
-// 现在实现了新的 core.RealtimeStockProvider 接口
+// Provider 腾讯股票数据提供商 - 简化版
+// 专注于核心数据获取功能，频率控制等横切关注点通过装饰器处理
 type Provider struct {
-	httpClient  *http.Client
-	lastRequest time.Time
-	requestMu   sync.Mutex
-	userAgent   string
-	log         *logrus.Entry
-
-	// 配置选项 - 为了向后兼容保留，但不在内部使用
-	rateLimit  time.Duration
-	maxRetries int
-	timeout    time.Duration
+	httpClient *http.Client
+	userAgent  string
+	log        *logrus.Entry
 }
 
 // NewProvider 创建腾讯数据提供商
@@ -46,11 +38,6 @@ func NewProvider() *Provider {
 		},
 		userAgent: "StockSub/1.0",
 		log:       logger.WithComponent("TencentProvider"),
-
-		// 默认配置值，保持向后兼容
-		rateLimit:  200 * time.Millisecond,
-		maxRetries: 3,
-		timeout:    15 * time.Second,
 	}
 }
 
@@ -59,31 +46,15 @@ func (p *Provider) Name() string {
 	return "tencent"
 }
 
-// GetRateLimit 获取请求频率限制
+// GetRateLimit 获取请求频率限制 (为了接口兼容性提供默认值)
 func (p *Provider) GetRateLimit() time.Duration {
-	return p.rateLimit
+	return 200 * time.Millisecond // 默认频率限制，实际由装饰器控制
 }
 
 // IsHealthy 检查提供商健康状态
 func (p *Provider) IsHealthy() bool {
 	// 简单的健康检查：检查HTTP客户端是否可用
 	return p.httpClient != nil
-}
-
-// SetRateLimit 设置请求频率限制
-func (p *Provider) SetRateLimit(limit time.Duration) {
-	p.rateLimit = limit
-}
-
-// SetTimeout 设置请求超时时间
-func (p *Provider) SetTimeout(timeout time.Duration) {
-	p.timeout = timeout
-	p.httpClient.Timeout = timeout
-}
-
-// SetMaxRetries 设置最大重试次数
-func (p *Provider) SetMaxRetries(retries int) {
-	p.maxRetries = retries
 }
 
 // FetchStockData 获取股票数据 (实现 core.RealtimeStockProvider 接口)
@@ -218,20 +189,6 @@ func (p *Provider) getMarketPrefix(symbol string) string {
 	}
 }
 
-// ===== 以下方法用于向后兼容 =====
-
-// FetchData 获取股票数据 (兼容旧版 subscriber.Provider 接口)
-func (p *Provider) FetchData(ctx context.Context, symbols []string) ([]subscriber.StockData, error) {
-	return p.FetchStockData(ctx, symbols)
-}
-
-// FetchDataWithRaw 获取股票数据和原始响应数据 (兼容旧版接口)
-func (p *Provider) FetchDataWithRaw(ctx context.Context, symbols []string) ([]subscriber.StockData, string, error) {
-	return p.FetchStockDataWithRaw(ctx, symbols)
-}
-
-// 确保 Provider 实现了所需的接口
+// 确保 Provider 实现了核心接口
 var _ core.RealtimeStockProvider = (*Provider)(nil)
-var _ core.Configurable = (*Provider)(nil)
 var _ core.Closable = (*Provider)(nil)
-var _ subscriber.Provider = (*Provider)(nil) // 向后兼容

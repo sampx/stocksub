@@ -47,7 +47,6 @@ type APIMonitor struct {
 	logger   *log.Logger
 	logFile  *os.File
 	cancel   context.CancelFunc
-	stopped  bool
 
 	// 安全组件
 	marketTime         *timing.MarketTime

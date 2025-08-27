@@ -1,5 +1,4 @@
 //go:build mage
-// +build mage
 
 package main
 
@@ -271,7 +270,7 @@ func Clean() error {
 }
 
 // Lint 运行代码检查并自动修复
-func Lint() error {
+func AutoFix() error {
 	fmt.Println("🔍 运行代码检查...")
 
 	// 首先检查格式问题
@@ -310,6 +309,22 @@ func Lint() error {
 	return nil
 }
 
+func Lint() error {
+	if _, err := exec.LookPath("golangci-lint"); err != nil {
+		fmt.Println("🔴 golangci-lint is not installed.")
+		fmt.Println("   Please run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest")
+		return err
+	}
+	fmt.Println("🔍 Running golangci-lint...")
+	return sh.RunV("golangci-lint", "run", "./...")
+}
+
+func Vet() error {
+	fmt.Println("🧪 Running go vet...")
+	const buildTags = "integration,mage"
+	return sh.RunV("go", "vet", "-tags="+buildTags, "./...")
+}
+
 // Coverage 生成测试覆盖率报告
 func Coverage() error {
 	fmt.Println("📈 生成测试覆盖率报告...")
@@ -337,22 +352,6 @@ func Coverage() error {
 
 	fmt.Println("✅ 覆盖率报告生成完成!")
 	fmt.Println("   详细报告: file://" + getAbsolutePath("./tests/reports/coverage.html"))
-	return nil
-}
-
-// Deploy 部署到生产环境
-func Deploy() error {
-	mg.Deps(Build, Test)
-
-	fmt.Println("🚀 部署到生产环境...")
-
-	// 这里可以添加具体的部署逻辑
-	// 例如：构建Docker镜像、推送到仓库、更新生产环境等
-
-	fmt.Println("✅ 部署准备完成!")
-	fmt.Println("运行以下命令进行部署:")
-	fmt.Println("  docker-compose -f docker-compose.prod.yml up -d")
-
 	return nil
 }
 

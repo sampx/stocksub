@@ -1,0 +1,60 @@
+# golangci-lint 配置文件
+# 文档: https://golangci-lint.run/usage/configuration/
+
+run:
+  # 建议明确指定项目使用的 Go 版本
+  go: '1.23'
+
+  # 设置命令运行的超时时间，防止卡死
+  timeout: 5m
+
+# -------------------------------------------------------------------
+# Linter 的具体设置
+# -------------------------------------------------------------------
+linters:
+  # 我们不启用所有 linter，而是按需启用一组推荐的 linter
+  # 禁用所有，然后手动启用需要的，可以保证配置的稳定性
+  disable-all: true
+  enable:
+    # 核心检查器
+    - errcheck      # 检查未处理的 error 返回值 (我们将在下面配置它)
+    - govet         # Go 官方提供的代码诊断工具
+    - staticcheck   # 功能强大的静态分析工具集
+    - unused        # 检查未使用的代码
+    - ineffassign   # 检查无效的赋值
+    - typecheck     # 确保代码可以通过类型检查
+    - gosimple      # 检查可以被简化的代码
+    - gofmt         # 检查代码是否已经格式化
+
+# -------------------------------------------------------------------
+# issues 部分用于控制和过滤报告的问题
+# -------------------------------------------------------------------
+issues:
+  # 每个 linter 和每个文件的最大问题数，0 代表无限制
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  # (修正) 跳过目录和文件的配置已移至此处
+  exclude-dirs:
+    - vendor
+  exclude-files:
+    - ".*_generated\\.go"
+
+  # --- 这是为你定制的核心规则 ---
+  #
+  # 排除规则 (Exclude Rules)
+  # 在这里，我们可以精确地忽略某些 linter 在特定文件中的报错
+  exclude-rules:
+    # 规则1: 忽略所有 _test.go 文件中的 errcheck 错误
+    # 这是解决你当前需求的关键配置
+    - path: _test\.go
+      linters:
+        - errcheck
+        - unused
+
+    # 你可以根据需要添加更多规则，例如：
+    #
+    # 规则2: 忽略 fmt.Print* 系列函数的错误检查 (这些函数很少返回需要处理的错误)
+    # - text: "Error return value of `fmt.Print"
+    #   linters:
+    #     - errcheck
