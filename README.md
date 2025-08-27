@@ -1,34 +1,98 @@
-# StockSub - 股票数据订阅器
+# StockSub - 分布式股票数据中台
 
-[![Go Version](https://img.shields.io/badge/Go-1.21+-blue.svg)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/Go-1.23+-blue.svg)](https://golang.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Docker](https://img.shields.io/badge/Docker-Compose-blue.svg)](https://docker.com)
+[![Redis](https://img.shields.io/badge/Redis-Streams-red.svg)](https://redis.io)
+[![InfluxDB](https://img.shields.io/badge/InfluxDB-2.x-orange.svg)](https://influxdata.com)
 
-StockSub 是一个高性能的股票数据订阅服务，支持实时获取A股、港股、美股等多市场股票数据。
+StockSub 是一个现代化的分布式金融数据中台，基于微服务架构设计，支持实时股票数据采集、分发、存储和查询。通过 Redis Streams 消息队列实现高可用、可水平扩展的数据处理能力。
 
-## ✨ 特性
+## ✨ 核心特性
 
-- 🚀 **高性能**: 基于Go语言，支持高并发订阅
-- 🌐 **多市场**: 支持A股（上证、深证、北交所）、港股、美股
-- ⚡ **实时数据**: 灵活的订阅间隔设置（最小1秒）
-- 🔄 **智能重试**: 内置指数退避重试机制
-- 📊 **统计监控**: 完整的订阅统计和健康监控
-- 🛡️ **错误处理**: 自动故障恢复和订阅重启
-- 📝 **日志系统**: 结构化日志，支持文件和控制台输出
-- 🔌 **模块化**: 清晰的架构设计，易于扩展
+### 🏗️ 分布式架构
+- 🔧 **微服务设计**: 数据采集、存储、API 服务完全解耦
+- 📡 **消息驱动**: 基于 Redis Streams 的发布-订阅模式
+- 🔄 **水平扩展**: 支持多实例部署和负载均衡
+- 🛡️ **故障隔离**: 单点故障不影响整体服务可用性
+
+### 📊 数据能力
+- 🌐 **多市场支持**: A股（上证、深证、北交所）
+- 🚀 **多数据源**: 腾讯、新浪等多个数据提供商
+- ⚡ **实时采集**: 毫秒级数据延迟，智能频率控制
+- 🗄️ **多重存储**: Redis 缓存 + InfluxDB 时序数据库
+- 📈 **历史数据**: 完整的时序数据存储和查询能力
+
+### 🔧 工程化特性
+- 🐳 **容器化部署**: Docker Compose 一键部署
+- ⚙️ **配置驱动**: YAML 配置文件动态任务调度
+- 📝 **结构化日志**: JSON 格式日志，便于分析和监控
+- 🧪 **测试完备**: 单元测试、集成测试、性能基准测试
+- 🔍 **可观测性**: 健康检查、指标监控、事件追踪
 
 ## 🚀 快速开始
 
-### 安装
+### 环境要求
 
-```bash
+- Go 1.23.0+
+- Docker & Docker Compose
+- Make 工具（可选）
+
+### 一键部署
+
+``bash
+# 克隆项目
 git clone <repository>
 cd stocksub
+
+# 下载依赖
 go mod download
+
+# 启动所有服务（推荐）
+mage docker:upAll
+
+# 或者分步启动
+mage docker:env          # 启动基础服务 (Redis + InfluxDB)
+mage docker:provider     # 启动数据采集节点
+mage docker:redisCollector   # 启动 Redis 收集器
+mage docker:influxCollector  # 启动 InfluxDB 收集器
+mage docker:apiServer    # 启动 API 服务器
 ```
 
-### 基本使用
+### 验证部署
 
-```go
+```bash
+# 检查服务状态
+docker-compose -f docker-compose.dev.yml ps
+
+# 测试 API 服务
+curl http://localhost:8080/health
+curl http://localhost:8080/stocks/600000
+
+# 查看实时数据流
+docker logs -f stocksub-provider-node-dev
+```
+
+### API 客户端使用（推荐）
+
+```bash
+# 获取实时股票数据
+curl "http://localhost:8080/stocks/600000"
+
+# 获取多个股票数据
+curl "http://localhost:8080/stocks/batch?symbols=600000,000001,AAPL"
+
+# 获取历史数据
+curl "http://localhost:8080/stocks/600000/history?start=2024-01-01&end=2024-01-31"
+
+# 获取系统状态
+curl "http://localhost:8080/health"
+curl "http://localhost:8080/metrics"
+```
+
+### 单机开发模式
+
+```
 package main
 
 import (
@@ -62,7 +126,7 @@ func main() {
 
 ### 高级使用（推荐）
 
-```go
+```
 package main
 
 import (
@@ -108,119 +172,288 @@ func stockCallback(data subscriber.StockData) error {
 }
 ```
 
-## 🏗️ 架构设计
+## 🏗️ 系统架构
+
+### 分布式服务架构
+
+```
+graph TB
+    subgraph "数据源"
+        DS1[腾讯API]
+        DS2[新浪API]
+    end
+    
+    subgraph "数据采集层"
+        PN1[Provider Node 1]
+        PN2[Provider Node 2]
+    end
+    
+    subgraph "消息队列"
+        RS[Redis Streams]
+    end
+    
+    subgraph "数据处理层"
+        RC1[Redis Collector 1]
+        RC2[Redis Collector 2]
+        IC1[InfluxDB Collector 1]
+        IC2[InfluxDB Collector 2]
+    end
+    
+    subgraph "存储层"
+        Redis[(Redis Cache)]
+        InfluxDB[(InfluxDB)]
+    end
+    
+    subgraph "API服务层"
+        API1[API Server 1]
+        API2[API Server 2]
+    end
+    
+    DS1 --> PN1
+    DS2 --> PN2
+    PN1 --> RS
+    PN2 --> RS
+    RS --> RC1
+    RS --> RC2
+    RS --> IC1
+    RS --> IC2
+    RC1 --> Redis
+    RC2 --> Redis
+    IC1 --> InfluxDB
+    IC2 --> InfluxDB
+    Redis --> API1
+    Redis --> API2
+    InfluxDB --> API1
+    InfluxDB --> API2
+```
+
+### 项目结构
 
 ```
 stocksub/
-├── cmd/                    # 命令行工具
-│   └── stocksub/          # 主程序
-├── pkg/                   # 核心库
-│   ├── subscriber/        # 订阅器核心
-│   │   ├── types.go      # 数据类型定义  
-│   │   ├── subscriber.go # 订阅器实现
-│   │   └── manager.go    # 管理器（推荐）
-│   ├── provider/         # 数据提供商
-│   │   └── tencent/      # 腾讯数据源
-│   ├── config/           # 配置管理
-│   └── logger/           # 日志系统
-└── examples/             # 示例代码
+├── cmd/                          # 微服务应用
+│   ├── provider_node/           # 数据采集节点
+│   ├── api_server/              # API 服务器
+│   ├── influxdb_collector/      # InfluxDB 收集器
+│   ├── redis_collector/         # Redis 收集器
+│   ├── api_monitor/             # API 监控器
+│   ├── logging_collector/       # 日志收集器
+│   ├── config_migrator/         # 配置迁移工具
+│   └── stocksub/               # 兼容性主程序
+├── pkg/                         # 核心库
+│   ├── provider/               # 数据提供商
+│   │   ├── core/              # 核心接口
+│   │   ├── tencent/           # 腾讯数据源
+│   │   ├── sina/              # 新浪数据源
+│   │   └── decorators/        # 装饰器（限流、熔断等）
+│   ├── subscriber/            # 订阅器（兼容层）
+│   ├── scheduler/             # 任务调度器
+│   ├── message/               # 消息格式定义
+│   ├── testkit/               # 测试工具包
+│   ├── limiter/               # 智能限流器
+│   ├── config/                # 配置管理
+│   └── logger/                # 日志系统
+├── config/                      # 配置文件
+│   ├── jobs.yaml              # 任务调度配置
+│   ├── api_server.yaml        # API 服务配置
+│   ├── influxdb_collector.yaml # InfluxDB 收集器配置
+│   └── redis_collector.yaml   # Redis 收集器配置
+├── docker-compose.dev.yml       # 开发环境
+├── docker-compose.prod.yml      # 生产环境
+└── magefile.go                 # 构建任务
 ```
 
 ### 核心组件
 
-1. **Provider（数据提供商）**: 负责从外部API获取股票数据
-2. **Subscriber（订阅器）**: 管理股票订阅和数据分发
-3. **Manager（管理器）**: 高级功能，包括统计、健康检查、自动重启
-4. **Config（配置）**: 统一的配置管理
-5. **Logger（日志）**: 结构化日志系统
+#### 数据采集层
+- **Provider Node**: 可独立部署的数据采集服务，支持多数据源
+- **Job Scheduler**: 基于 Cron 表达式的任务调度器
+- **Intelligent Limiter**: 智能频率控制和错误重试
 
-## 📈 支持的股票市场
+#### 消息队列层
+- **Redis Streams**: 高性能消息队列，支持消费者组模式
+- **Message Format**: 标准化的 JSON 消息格式，包含校验和元数据
+
+#### 数据处理层
+- **Redis Collector**: 实时数据缓存，支持快速查询
+- **InfluxDB Collector**: 时序数据持久化，支持历史查询
+- **Consumer Groups**: 水平扩展和负载均衡
+
+#### API 服务层
+- **REST API**: 标准 HTTP API，支持实时和历史数据查询
+- **Health Check**: 服务健康状态监控
+- **Metrics**: 性能指标和统计信息
+
+#### 存储层
+- **Redis**: 实时数据缓存，毫秒级查询响应
+- **InfluxDB**: 时序数据库，高效存储和查询历史数据
+
+## 📈 支持的数据源与市场
+
+### 数据提供商
+
+| 提供商 | 类型 | 市场覆盖 | 特点 |
+|--------|------|----------|------|
+| **腾讯财经** | 实时行情 | A股 | 数据稳定，延迟低 |
+| **新浪财经** | 实时行情 | A股 | 备用数据源 |
+| **自定义** | 可扩展 | 任意市场 | 支持插件化扩展 |
+
+### 支持的股票市场
 
 | 市场 | 格式示例 | 说明 |
 |------|----------|------|
 | **A股上证** | `600000`, `601398` | 6开头的6位数字 |
 | **A股深证** | `000001`, `300750` | 0/3开头的6位数字 |  
 | **A股北交** | `835174`, `832000` | 4/8开头的6位数字 |
-| **港股** | `00700`, `03690` | 5位数字 |
-| **美股** | `AAPL`, `TSLA` | 1-5位字母 |
 
-## ⚙️ 配置说明
+## ⚙️ 配置与管理
 
-### 基础配置
+### 任务调度配置 (jobs.yaml)
 
-```go
-config := config.Default()
-config.SetDefaultInterval(5 * time.Second)    // 默认订阅间隔
-config.SetMaxSubscriptions(50)                // 最大订阅数
-config.SetRateLimit(200 * time.Millisecond)  // 请求频率限制
+```yaml
+jobs:
+  - name: "fetch-realtime-stock-ashare"
+    enabled: true
+    schedule: "*/3 * 9-11,13-14 * * 1-5"  # 每3秒，交易时段
+    provider:
+      name: "tencent"
+      type: "RealtimeStock"
+    params:
+      symbols: ["600000", "000001"]
+      market: "A-share"
+    output:
+      stream: "stream:stock:realtime"
+
+  - name: "fetch-daily-history"
+    enabled: true
+    schedule: "0 16 * * 1-5"  # 每天16:00
+    provider:
+      name: "tencent"
+      type: "Historical"
+    params:
+      symbols: ["all"]
+      period: "1d"
 ```
 
-### 日志配置
+### API 服务配置 (api_server.yaml)
 
-```go
-config.Logger.Level = "info"        // debug, info, warn, error
-config.Logger.Output = "both"       // console, file, both  
-config.Logger.Filename = "app.log"  // 日志文件名
+```yaml
+server:
+  port: 8080
+  timeout: 30s
+  
+redis:
+  url: "redis://localhost:6379"
+  password: ""
+  db: 0
+  
+influxdb:
+  url: "http://localhost:8086"
+  token: "your-influxdb-token"
+  org: "stocksub"
+  bucket: "stockdata"
+  
+cache:
+  ttl: 300s
+  max_size: 10000
 ```
 
-## 🔧 命令行工具
+### 数据收集器配置
 
-### 测试
+```yaml
+# redis_collector.yaml
+redis:
+  url: "redis://localhost:6379"
+  stream: "stream:stock:realtime"
+  group: "redis-collectors"
+  consumer: "redis-collector-1"
+  
+batch_size: 100
+flush_interval: 5s
+
+# influxdb_collector.yaml
+influxdb:
+  url: "http://localhost:8086"
+  token: "your-token"
+  org: "stocksub"
+  bucket: "stockdata"
+  
+redis:
+  url: "redis://localhost:6379"
+  stream: "stream:stock:realtime"
+  group: "influxdb-collectors"
+  consumer: "influxdb-collector-1"
+```
+
+## 🔧 开发与运维
+
+### Mage 任务管理
 
 ```bash
-# 运行所有单元测试
-go test -v ./pkg/...
+# 查看所有可用任务
+mage
 
-# 运行所有集成测试
-go test -v -tags=integration ./pkg/...
+# 构建所有服务
+mage build
 
-# 运行特定包的集成测试
-go test -v -tags=integration ./pkg/provider/tencent/
+# 运行测试
+mage test                    # 所有测试
+mage testUnit               # 单元测试
+mage testIntegration        # 集成测试
+mage benchmark              # 性能基准测试
 
-# 运行系统级测试
-go test -v -tags=integration ./tests/
+# Docker 服务管理
+mage docker:build           # 构建镜像
+mage docker:env             # 启动基础环境
+mage docker:upAll           # 启动所有服务
+mage docker:provider        # 启动数据采集节点
+mage docker:redisCollector  # 启动 Redis 收集器
+mage docker:influxCollector # 启动 InfluxDB 收集器
+mage docker:apiServer       # 启动 API 服务器
+mage docker:down            # 停止所有服务
 
-# 运行性能基准测试
-go test -v -bench=. -benchmem ./pkg/testkit/
+# 工具
+mage clean                  # 清理构建产物
+mage lint                   # 代码检查
+mage coverage               # 测试覆盖率
+mage deploy                 # 部署到生产环境
 ```
 
-### 构建
+### 手动构建与运行
 
 ```bash
-# 构建主程序
-go build -o stocksub ./cmd/stocksub
+# 构建所有服务
+go build -o dist/provider_node ./cmd/provider_node
+go build -o dist/api_server ./cmd/api_server
+go build -o dist/influxdb_collector ./cmd/influxdb_collector
+go build -o dist/redis_collector ./cmd/redis_collector
 
-# 构建示例程序
-go build -o simple-example ./examples/simple
-go build -o advanced-example ./examples/advanced
-```
+# 单独运行服务
+./dist/provider_node --config config/jobs.yaml
+./dist/api_server --config config/api_server.yaml
+./dist/influxdb_collector --config config/influxdb_collector.yaml
+./dist/redis_collector --config config/redis_collector.yaml
 
-### 运行
-
-```bash
-# 运行主程序
-./stocksub
-
-# 运行示例
-./simple-example
-./advanced-example
-
-# 直接运行
+# 兼容模式运行
 go run ./cmd/stocksub
-go run ./examples/simple
+go run ./examples/subscriber/simple
 ```
 
-### 交叉编译
+### 生产部署
 
 ```bash
-# Linux
-GOOS=linux GOARCH=amd64 go build -o stocksub-linux ./cmd/stocksub
+# 生产环境部署
+docker-compose -f docker-compose.prod.yml up -d
 
-# Windows  
-GOOS=windows GOARCH=amd64 go build -o stocksub.exe ./cmd/stocksub
+# 查看服务状态
+docker-compose -f docker-compose.prod.yml ps
 
-# macOS
-GOOS=darwin GOARCH=amd64 go build -o stocksub-macos ./cmd/stocksub
+# 查看日志
+docker-compose -f docker-compose.prod.yml logs -f
+
+# 滚动更新
+docker-compose -f docker-compose.prod.yml pull
+docker-compose -f docker-compose.prod.yml up -d
 ```
 
 ## 📊 监控和统计
@@ -256,7 +489,69 @@ for event := range eventChan {
 }
 ```
 
-## 🛠️ API 参考
+## 📊 REST API 参考
+
+### 实时数据 API
+
+```bash
+# 单个股票实时数据
+GET /stocks/{symbol}
+
+# 批量获取实时数据
+GET /stocks/batch?symbols=600000,000001
+
+# 按市场获取数据
+GET /stocks/market/{market}  # market: ashare
+```
+
+### 历史数据 API
+
+```bash
+# 获取历史K线数据
+GET /stocks/{symbol}/history?start=2024-01-01&end=2024-01-31&period=1d
+
+# 获取实时数据流
+GET /stocks/{symbol}/stream
+```
+
+### 系统监控 API
+
+```bash
+# 健康检查
+GET /health
+
+# 性能指标
+GET /metrics
+
+# 系统统计
+GET /stats
+```
+
+### API 响应格式
+
+```json
+{
+  "header": {
+    "messageId": "550e8400-e29b-41d4-a716-446655440000",
+    "timestamp": 1678886400,
+    "version": "1.0",
+    "producer": "api-server-1"
+  },
+  "data": {
+    "symbol": "600000",
+    "name": "浦发银行",
+    "price": 10.50,
+    "change": 0.15,
+    "changePercent": 1.45,
+    "volume": 1250000,
+    "turnover": 13125000.0,
+    "timestamp": "2024-01-15T09:30:00Z",
+    "market": "ashare"
+  }
+}
+```
+
+## 🛠️ 订阅器库接口（兼容模式）
 
 ### 订阅器接口
 
@@ -329,13 +624,27 @@ type StockData struct {
 config.SetLogLevel("debug")  // 启用调试日志
 ```
 
-## 🚧 性能指标
+## 🚀 性能指标与技术规格
 
-- **内存占用**: < 50MB (100个订阅)
-- **CPU占用**: < 5% (正常负载)
-- **网络延迟**: 200-500ms (取决于订阅间隔)
-- **支持订阅**: 最多1000个股票同时订阅
-- **数据延迟**: 1-3秒 (腾讯接口延迟)
+### 系统性能
+- **单节点内存占用**: < 100MB （每个微服务）
+- **CPU 占用**: < 10% （正常负载）
+- **数据延迟**: 1-3秒 （数据源延迟）
+- **API 响应时间**: < 100ms （实时数据），< 500ms （历史数据）
+- **并发处理**: 10,000+ QPS （API 服务器）
+
+### 扩展性
+- **数据采集节点**: 无上限水平扩展
+- **数据收集器**: 支持多实例负载均衡
+- **API 服务器**: 无状态，可水平扩展
+- **支持股票数**: 无理论上限（取决于存储容量）
+
+### 技术规格
+- **Go 版本**: 1.23.0+
+- **Redis**: 7.0+ （支持 Streams）
+- **InfluxDB**: 2.7+
+- **Docker**: 20.10+
+- **Docker Compose**: 2.0+
 
 ## 📄 许可证
 
