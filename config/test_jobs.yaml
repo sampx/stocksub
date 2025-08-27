@@ -1,0 +1,14 @@
+# 测试配置 - 用于验证 Phase 3 功能
+jobs:
+  # 高频测试任务 - 每3秒执行一次
+  - name: "phase3-test"
+    enabled: true
+    schedule: "*/3 * * * * *"  # 每3秒
+    provider:
+      name: "tencent"
+      type: "RealtimeStock"
+    params:
+      symbols: ["600000"]  # 只测试一只股票
+    output:
+      type: "redis_stream"
+      stream: "stream:stock:realtime"

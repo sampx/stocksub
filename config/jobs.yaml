@@ -1,0 +1,81 @@
+# StockSub Provider Node 任务配置
+# 基于 Cron 表达式的灵活任务调度
+
+jobs:
+  # 实时股票数据采集 - A股主要股票
+  - name: "fetch-realtime-stock-ashare-main"
+    enabled: true
+    schedule: "*/5 * 9-11,13-14 * * 1-5"  # 每5秒，交易时段，工作日
+    provider:
+      name: "tencent"
+      type: "RealtimeStock"
+    params:
+      symbols: ["600000", "000001", "000002", "600036", "600519"]
+    output:
+      type: "redis_stream"
+      stream: "stream:stock:realtime"
+
+  # 实时股票数据采集 - 科创板
+  - name: "fetch-realtime-stock-star"
+    enabled: true
+    schedule: "*/10 * 9-11,13-14 * * 1-5"  # 每10秒，交易时段，工作日
+    provider:
+      name: "tencent"
+      type: "RealtimeStock"
+    params:
+      symbols: ["688036", "688599", "688981"]
+    output:
+      type: "redis_stream"
+      stream: "stream:stock:realtime"
+
+  # 港股数据采集
+  - name: "fetch-realtime-stock-hk"
+    enabled: true
+    schedule: "*/15 * 9-12,13-16 * * 1-5"  # 每15秒，港股交易时段
+    provider:
+      name: "tencent"
+      type: "RealtimeStock"
+    params:
+      symbols: ["00700", "03690", "09988"]
+    output:
+      type: "redis_stream"
+      stream: "stream:stock:realtime"
+
+  # 测试任务 - 单只股票高频采集
+  - name: "test-high-frequency"
+    enabled: false  # 默认禁用，用于测试
+    schedule: "*/2 * * * * *"  # 每2秒
+    provider:
+      name: "tencent"
+      type: "RealtimeStock"
+    params:
+      symbols: ["600000"]
+    output:
+      type: "redis_stream"
+      stream: "stream:stock:realtime"
+
+  # 收盘后数据汇总
+  - name: "daily-summary"
+    enabled: true
+    schedule: "0 0 15 * * 1-5"  # 每天15:00（收盘后）
+    provider:
+      name: "tencent"
+      type: "RealtimeStock"
+    params:
+      symbols: ["600000", "000001", "000002", "600036", "600519", "688036", "00700"]
+    output:
+      type: "redis_stream"
+      stream: "stream:stock:realtime"
+
+  # 周末维护任务（示例）
+  - name: "weekend-maintenance"
+    enabled: false
+    schedule: "0 0 2 * * 0"  # 每周日凌晨2点
+    provider:
+      name: "tencent"
+      type: "RealtimeStock"
+    params:
+      symbols: ["600000"]
+    output:
+      type: "redis_stream"
+      stream: "stream:maintenance"

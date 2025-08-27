@@ -1,0 +1,21 @@
+# 从 api_monitor 迁移的配置
+# 原始参数:
+#   symbols: 600000,000001
+#   duration: 1h
+#   interval: 3s
+# 迁移时间: 2025-08-27 08:50:09
+
+jobs:
+    - name: test-migration
+      enabled: true
+      schedule: '*/3 * * * * *'
+      provider:
+        name: tencent
+        type: RealtimeStock
+      params:
+        symbols:
+            - "600000"
+            - "000001"
+      output:
+        type: redis_stream
+        stream: stream:stock:realtime

@@ -11,7 +11,7 @@ import (
 // 所有装饰器都应该实现此接口
 type Decorator interface {
 	core.Provider
-	
+
 	// GetBaseProvider 获取被装饰的基础 Provider
 	GetBaseProvider() core.Provider
 }
@@ -23,7 +23,7 @@ type RealtimeStockDecorator interface {
 	Decorator
 }
 
-// RealtimeIndexDecorator 实时指数装饰器接口  
+// RealtimeIndexDecorator 实时指数装饰器接口
 // 装饰 RealtimeIndexProvider
 type RealtimeIndexDecorator interface {
 	core.RealtimeIndexProvider
@@ -80,7 +80,7 @@ func (d *RealtimeStockBaseDecorator) FetchStockData(ctx context.Context, symbols
 	return d.stockProvider.FetchStockData(ctx, symbols)
 }
 
-// FetchStockDataWithRaw 实现 RealtimeStockProvider 接口  
+// FetchStockDataWithRaw 实现 RealtimeStockProvider 接口
 func (d *RealtimeStockBaseDecorator) FetchStockDataWithRaw(ctx context.Context, symbols []string) ([]subscriber.StockData, string, error) {
 	return d.stockProvider.FetchStockDataWithRaw(ctx, symbols)
 }
@@ -125,4 +125,26 @@ type DecoratorFactory struct{}
 // NewDecoratorFactory 创建装饰器工厂
 func NewDecoratorFactory() *DecoratorFactory {
 	return &DecoratorFactory{}
+}
+
+// ApplyDefaultDecorators 应用默认装饰器配置
+func ApplyDefaultDecorators(provider core.RealtimeStockProvider) (core.RealtimeStockProvider, error) {
+	// 应用频率控制装饰器
+	frequencyProvider := NewFrequencyControlProvider(provider, &FrequencyControlConfig{
+		MinInterval: 200 * time.Millisecond,
+		MaxRetries:  3,
+		Enabled:     true,
+	})
+
+	// 应用熔断器装饰器
+	circuitProvider := NewCircuitBreakerProvider(frequencyProvider, &CircuitBreakerConfig{
+		Name:        "default-circuit-breaker",
+		MaxRequests: 3,
+		Interval:    30 * time.Second,
+		Timeout:     30 * time.Second,
+		ReadyToTrip: 5,
+		Enabled:     true,
+	})
+
+	return circuitProvider, nil
 }

@@ -1,0 +1,14 @@
+# Mock 测试配置 - 用于验证消息流转
+jobs:
+  # 使用 Mock 数据的测试任务
+  - name: "mock-test"
+    enabled: true
+    schedule: "*/5 * * * * *"  # 每5秒
+    provider:
+      name: "mock"  # 使用 mock 提供商
+      type: "RealtimeStock"
+    params:
+      symbols: ["TEST001", "TEST002"]
+    output:
+      type: "redis_stream"
+      stream: "stream:stock:realtime"
