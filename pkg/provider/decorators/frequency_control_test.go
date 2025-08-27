@@ -3,13 +3,28 @@ package decorators
 import (
 	"context"
 	"stocksub/pkg/limiter"
+	"stocksub/pkg/timing"
 	"strings"
 	"testing"
 	"time"
 )
 
+// MockTimeService 模拟时间服务，用于测试
+type MockTimeService struct {
+	currentTime time.Time
+}
+
+func (m *MockTimeService) Now() time.Time {
+	return m.currentTime
+}
+
 func TestFrequencyControlProvider_基础功能测试(t *testing.T) {
 	mockProvider := NewMockRealtimeStockProvider("TestProvider")
+	
+	// 创建模拟时间服务，设置为交易时间
+	mockTime := &MockTimeService{
+		currentTime: time.Date(2023, 10, 23, 10, 0, 0, 0, time.Local), // 周一上午10点
+	}
 	
 	config := &FrequencyControlConfig{
 		MinInterval: 100 * time.Millisecond,
@@ -17,7 +32,17 @@ func TestFrequencyControlProvider_基础功能测试(t *testing.T) {
 		Enabled:     true,
 	}
 	
-	fcProvider := NewFrequencyControlProvider(mockProvider, config)
+	// 使用模拟时间服务创建频率控制装饰器
+	mockMarketTime := timing.NewMarketTime(mockTime)
+	fcProvider := &FrequencyControlProvider{
+		RealtimeStockBaseDecorator: NewRealtimeStockBaseDecorator(mockProvider),
+		limiter:                   limiter.NewIntelligentLimiter(mockMarketTime),
+		marketTime:                mockMarketTime,
+		minInterval:               config.MinInterval,
+		maxRetries:                config.MaxRetries,
+		isActive:                  config.Enabled,
+		lastRequest:               time.Time{},
+	}
 	
 	// 测试装饰器名称
 	expectedName := "FrequencyControl(TestProvider)"
@@ -31,6 +56,8 @@ func TestFrequencyControlProvider_基础功能测试(t *testing.T) {
 	}
 	
 	// 测试健康状态
+	// 先初始化批次，否则健康检查会失败
+	fcProvider.limiter.InitializeBatch([]string{"600000"})
 	if !fcProvider.IsHealthy() {
 		t.Error("期望健康状态为 true")
 	}
@@ -39,13 +66,28 @@ func TestFrequencyControlProvider_基础功能测试(t *testing.T) {
 func TestFrequencyControlProvider_频率控制测试(t *testing.T) {
 	mockProvider := NewMockRealtimeStockProvider("TestProvider")
 	
+	// 创建模拟时间服务，设置为交易时间
+	mockTime := &MockTimeService{
+		currentTime: time.Date(2023, 10, 23, 10, 0, 0, 0, time.Local), // 周一上午10点
+	}
+	
 	config := &FrequencyControlConfig{
 		MinInterval: 200 * time.Millisecond,
 		MaxRetries:  2,
 		Enabled:     true,
 	}
 	
-	fcProvider := NewFrequencyControlProvider(mockProvider, config)
+	// 使用模拟时间服务创建频率控制装饰器
+	mockMarketTime := timing.NewMarketTime(mockTime)
+	fcProvider := &FrequencyControlProvider{
+		RealtimeStockBaseDecorator: NewRealtimeStockBaseDecorator(mockProvider),
+		limiter:                   limiter.NewIntelligentLimiter(mockMarketTime),
+		marketTime:                mockMarketTime,
+		minInterval:               config.MinInterval,
+		maxRetries:                config.MaxRetries,
+		isActive:                  config.Enabled,
+		lastRequest:               time.Time{},
+	}
 	
 	ctx := context.Background()
 	symbols := []string{"600000"}
@@ -114,6 +156,11 @@ func TestFrequencyControlProvider_禁用状态测试(t *testing.T) {
 }
 
 func TestFrequencyControlProvider_重试逻辑测试(t *testing.T) {
+	// 创建模拟时间服务，设置为交易时间
+	mockTime := &MockTimeService{
+		currentTime: time.Date(2023, 10, 23, 10, 0, 0, 0, time.Local), // 周一上午10点
+	}
+	
 	mockProvider := NewMockRealtimeStockProvider("TestProvider")
 	
 	config := &FrequencyControlConfig{
@@ -122,7 +169,17 @@ func TestFrequencyControlProvider_重试逻辑测试(t *testing.T) {
 		Enabled:     true,
 	}
 	
-	fcProvider := NewFrequencyControlProvider(mockProvider, config)
+	// 使用模拟时间服务创建频率控制装饰器
+	mockMarketTime := timing.NewMarketTime(mockTime)
+	fcProvider := &FrequencyControlProvider{
+		RealtimeStockBaseDecorator: NewRealtimeStockBaseDecorator(mockProvider),
+		limiter:                   limiter.NewIntelligentLimiter(mockMarketTime),
+		marketTime:                mockMarketTime,
+		minInterval:               config.MinInterval,
+		maxRetries:                config.MaxRetries,
+		isActive:                  config.Enabled,
+		lastRequest:               time.Time{},
+	}
 	
 	ctx := context.Background()
 	symbols := []string{"600000"}
@@ -186,6 +243,11 @@ func TestFrequencyControlProvider_配置动态修改测试(t *testing.T) {
 }
 
 func TestFrequencyControlProvider_FetchStockDataWithRaw测试(t *testing.T) {
+	// 创建模拟时间服务，设置为交易时间
+	mockTime := &MockTimeService{
+		currentTime: time.Date(2023, 10, 23, 10, 0, 0, 0, time.Local), // 周一上午10点
+	}
+	
 	mockProvider := NewMockRealtimeStockProvider("TestProvider")
 	
 	config := &FrequencyControlConfig{
@@ -194,7 +256,17 @@ func TestFrequencyControlProvider_FetchStockDataWithRaw测试(t *testing.T) {
 		Enabled:     true,
 	}
 	
-	fcProvider := NewFrequencyControlProvider(mockProvider, config)
+	// 使用模拟时间服务创建频率控制装饰器
+	mockMarketTime := timing.NewMarketTime(mockTime)
+	fcProvider := &FrequencyControlProvider{
+		RealtimeStockBaseDecorator: NewRealtimeStockBaseDecorator(mockProvider),
+		limiter:                   limiter.NewIntelligentLimiter(mockMarketTime),
+		marketTime:                mockMarketTime,
+		minInterval:               config.MinInterval,
+		maxRetries:                config.MaxRetries,
+		isActive:                  config.Enabled,
+		lastRequest:               time.Time{},
+	}
 	
 	ctx := context.Background()
 	symbols := []string{"600000"}
@@ -252,6 +324,11 @@ func TestFrequencyControlProvider_状态获取测试(t *testing.T) {
 }
 
 func TestFrequencyControlProvider_智能限流器集成测试(t *testing.T) {
+	// 创建模拟时间服务，设置为交易时间
+	mockTime := &MockTimeService{
+		currentTime: time.Date(2023, 10, 23, 10, 0, 0, 0, time.Local), // 周一上午10点
+	}
+	
 	mockProvider := NewMockRealtimeStockProvider("TestProvider")
 	
 	config := &FrequencyControlConfig{
@@ -260,7 +337,17 @@ func TestFrequencyControlProvider_智能限流器集成测试(t *testing.T) {
 		Enabled:     true,
 	}
 	
-	fcProvider := NewFrequencyControlProvider(mockProvider, config)
+	// 使用模拟时间服务创建频率控制装饰器
+	mockMarketTime := timing.NewMarketTime(mockTime)
+	fcProvider := &FrequencyControlProvider{
+		RealtimeStockBaseDecorator: NewRealtimeStockBaseDecorator(mockProvider),
+		limiter:                   limiter.NewIntelligentLimiter(mockMarketTime),
+		marketTime:                mockMarketTime,
+		minInterval:               config.MinInterval,
+		maxRetries:                config.MaxRetries,
+		isActive:                  config.Enabled,
+		lastRequest:               time.Time{},
+	}
 	
 	// 测试限流器状态检查
 	// 注意：这个测试可能会因为交易时间检测而失败，这是预期的行为
@@ -279,6 +366,11 @@ func TestFrequencyControlProvider_智能限流器集成测试(t *testing.T) {
 }
 
 func TestFrequencyControlProvider_与limiter模块的一致性测试(t *testing.T) {
+	// 创建模拟时间服务，设置为交易时间
+	mockTime := &MockTimeService{
+		currentTime: time.Date(2023, 10, 23, 10, 0, 0, 0, time.Local), // 周一上午10点
+	}
+	
 	mockProvider := NewMockRealtimeStockProvider("TestProvider")
 	
 	config := &FrequencyControlConfig{
@@ -287,7 +379,17 @@ func TestFrequencyControlProvider_与limiter模块的一致性测试(t *testing.
 		Enabled:     true,
 	}
 	
-	fcProvider := NewFrequencyControlProvider(mockProvider, config)
+	// 使用模拟时间服务创建频率控制装饰器
+	mockMarketTime := timing.NewMarketTime(mockTime)
+	fcProvider := &FrequencyControlProvider{
+		RealtimeStockBaseDecorator: NewRealtimeStockBaseDecorator(mockProvider),
+		limiter:                   limiter.NewIntelligentLimiter(mockMarketTime),
+		marketTime:                mockMarketTime,
+		minInterval:               config.MinInterval,
+		maxRetries:                config.MaxRetries,
+		isActive:                  config.Enabled,
+		lastRequest:               time.Time{},
+	}
 	
 	// 验证与 limiter 包的一致性
 	if config.MaxRetries != limiter.MaxRetries {
