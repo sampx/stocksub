@@ -30,7 +30,7 @@ type DecoratorConfig struct {
 	Config   map[string]interface{} `yaml:"config" mapstructure:"config"`
 }
 
-// ProviderDecoratorConfig 提供商装饰器完整配置  
+// ProviderDecoratorConfig 提供商装饰器完整配置
 type ProviderDecoratorConfig struct {
 	Decorators []DecoratorConfig `yaml:"decorators" mapstructure:"decorators"`
 }
@@ -49,7 +49,7 @@ func (cdc *ConfigurableDecoratorChain) LoadFromViper(v *viper.Viper, configKey s
 	if err := v.UnmarshalKey(configKey, &config); err != nil {
 		return fmt.Errorf("无法解析装饰器配置: %w", err)
 	}
-	
+
 	cdc.decorators = config.Decorators
 	return nil
 }
@@ -68,7 +68,7 @@ func (cdc *ConfigurableDecoratorChain) AddDecorator(decoratorConfig DecoratorCon
 func (cdc *ConfigurableDecoratorChain) Apply(stockProvider core.RealtimeStockProvider) (core.RealtimeStockProvider, error) {
 	// 按优先级排序装饰器
 	sortedDecorators := cdc.getSortedEnabledDecorators()
-	
+
 	// 逐个应用装饰器
 	current := stockProvider
 	for _, decoratorConfig := range sortedDecorators {
@@ -78,21 +78,21 @@ func (cdc *ConfigurableDecoratorChain) Apply(stockProvider core.RealtimeStockPro
 		}
 		current = decorated
 	}
-	
+
 	return current, nil
 }
 
 // getSortedEnabledDecorators 获取按优先级排序的已启用装饰器
 func (cdc *ConfigurableDecoratorChain) getSortedEnabledDecorators() []DecoratorConfig {
 	enabled := make([]DecoratorConfig, 0)
-	
+
 	// 过滤出启用的装饰器
 	for _, decorator := range cdc.decorators {
 		if decorator.Enabled {
 			enabled = append(enabled, decorator)
 		}
 	}
-	
+
 	// 按优先级排序（数值越小优先级越高）
 	for i := 0; i < len(enabled)-1; i++ {
 		for j := i + 1; j < len(enabled); j++ {
@@ -101,7 +101,7 @@ func (cdc *ConfigurableDecoratorChain) getSortedEnabledDecorators() []DecoratorC
 			}
 		}
 	}
-	
+
 	return enabled
 }
 
@@ -134,7 +134,7 @@ func (df *DecoratorFactory) createFrequencyControlProvider(stockProvider core.Re
 		MaxRetries:  3,
 		Enabled:     true,
 	}
-	
+
 	// 解析配置
 	if configMap != nil {
 		if minInterval, ok := configMap["min_interval"].(string); ok {
@@ -152,14 +152,14 @@ func (df *DecoratorFactory) createFrequencyControlProvider(stockProvider core.Re
 			config.Enabled = enabled
 		}
 	}
-	
+
 	return NewFrequencyControlProvider(stockProvider, config), nil
 }
 
 // createCircuitBreakerProvider 创建熔断器装饰器
 func (df *DecoratorFactory) createCircuitBreakerProvider(stockProvider core.RealtimeStockProvider, configMap map[string]interface{}) (core.RealtimeStockProvider, error) {
 	config := DefaultCircuitBreakerConfig()
-	
+
 	// 解析配置
 	if configMap != nil {
 		if name, ok := configMap["name"].(string); ok {
@@ -185,7 +185,7 @@ func (df *DecoratorFactory) createCircuitBreakerProvider(stockProvider core.Real
 			config.Enabled = enabled
 		}
 	}
-	
+
 	return NewCircuitBreakerProvider(stockProvider, config), nil
 }
 
@@ -201,11 +201,11 @@ func CreateDecoratedProvider(stockProvider core.RealtimeStockProvider, config Pr
 func CreateDecoratedProviderFromViper(stockProvider core.RealtimeStockProvider, v *viper.Viper, configKey string) (core.RealtimeStockProvider, error) {
 	factory := NewDecoratorFactory()
 	chain := NewConfigurableDecoratorChain(factory)
-	
+
 	if err := chain.LoadFromViper(v, configKey); err != nil {
 		return nil, err
 	}
-	
+
 	return chain.Apply(stockProvider)
 }
 
@@ -228,12 +228,12 @@ func DefaultDecoratorConfig() ProviderDecoratorConfig {
 				Enabled:  true,
 				Priority: 2, // 熔断器优先级低，后应用
 				Config: map[string]interface{}{
-					"name":           "StockProvider",
-					"max_requests":   5,
-					"interval":       "60s",
-					"timeout":        "30s",
-					"ready_to_trip":  5,
-					"enabled":        true,
+					"name":          "StockProvider",
+					"max_requests":  5,
+					"interval":      "60s",
+					"timeout":       "30s",
+					"ready_to_trip": 5,
+					"enabled":       true,
 				},
 			},
 		},
@@ -259,12 +259,12 @@ func ProductionDecoratorConfig() ProviderDecoratorConfig {
 				Enabled:  true,
 				Priority: 2,
 				Config: map[string]interface{}{
-					"name":           "ProductionStockProvider",
-					"max_requests":   3,
-					"interval":       "120s",
-					"timeout":        "60s",
-					"ready_to_trip":  3, // 更敏感的熔断策略
-					"enabled":        true,
+					"name":          "ProductionStockProvider",
+					"max_requests":  3,
+					"interval":      "120s",
+					"timeout":       "60s",
+					"ready_to_trip": 3, // 更敏感的熔断策略
+					"enabled":       true,
 				},
 			},
 		},
@@ -306,7 +306,7 @@ func MonitoringDecoratorConfig() ProviderDecoratorConfig {
 				Priority: 1,
 				Config: map[string]interface{}{
 					"min_interval_ms": 3000, // 3秒间隔，适合长期监控
-					"max_retries":     5,     // 更多重试次数
+					"max_retries":     5,    // 更多重试次数
 					"enabled":         true,
 				},
 			},
@@ -315,12 +315,12 @@ func MonitoringDecoratorConfig() ProviderDecoratorConfig {
 				Enabled:  true,
 				Priority: 2,
 				Config: map[string]interface{}{
-					"name":           "LongTermMonitoringProvider",
-					"max_requests":   10,      // 更宽松的熔断策略
-					"interval":       "300s",  // 5分钟统计窗口
-					"timeout":        "120s",  // 2分钟超时
-					"ready_to_trip":  10,      // 更高的阈值
-					"enabled":        true,
+					"name":          "LongTermMonitoringProvider",
+					"max_requests":  10,     // 更宽松的熔断策略
+					"interval":      "300s", // 5分钟统计窗口
+					"timeout":       "120s", // 2分钟超时
+					"ready_to_trip": 10,     // 更高的阈值
+					"enabled":       true,
 				},
 			},
 		},

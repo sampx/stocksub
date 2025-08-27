@@ -62,15 +62,15 @@ services:
     networks:
       - stocksub-prod-network
 
-  # Provider Node 实例（多个实例负载均衡）
-  provider-node-1:
+  # Fetcher 实例（多个实例负载均衡）
+  fetcher-1:
     build:
       context: .
       dockerfile: Dockerfile
-      target: provider-node
-    container_name: stocksub-provider-node-1
+      target: fetcher
+    container_name: stocksub-fetcher-1
     environment:
-      - NODE_ID=provider-node-1
+      - NODE_ID=fetcher-1
       - REDIS_URL=redis://:production_redis_pass_2024@redis:6379/0
       - CONFIG_FILE=/app/config/jobs.yaml
     volumes:
@@ -88,14 +88,14 @@ services:
     networks:
       - stocksub-prod-network
 
-  provider-node-2:
+  fetcher-2:
     build:
       context: .
       dockerfile: Dockerfile
-      target: provider-node
-    container_name: stocksub-provider-node-2
+      target: fetcher
+    container_name: stocksub-fetcher-2
     environment:
-      - NODE_ID=provider-node-2
+      - NODE_ID=fetcher-2
       - REDIS_URL=redis://:production_redis_pass_2024@redis:6379/0
       - CONFIG_FILE=/app/config/jobs.yaml
     volumes:

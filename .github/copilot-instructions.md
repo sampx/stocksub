@@ -12,24 +12,44 @@ StockSub is an enterprise-grade A-share real-time data subscription service buil
 ### Directory Structure
 
 - **`cmd/stocksub/`** - Main application with graceful shutdown
+- **`cmd/fetcher/`** - Standalone data provider service that fetches from sources (Tencent, Sina) and publishes to Redis Streams.
+- **`cmd/api_server/`** - API server that likely consumes data from Redis to serve clients.
 - **`cmd/api_monitor/`** - Long-term API monitoring with intelligent rate limiting
 - **`cmd/api_analyzer/`** - Data analysis tools for CSV data
-- **`cmd/data_exporter/`** - Data export utilities
 - **`pkg/subscriber/`** - Core subscription engine (subscriber, manager, types)
-- **`pkg/provider/tencent/`** - Tencent data source implementation
+- **`pkg/provider/`** - Data source implementations (Tencent, Sina) and decorators.
+- **`pkg/message/`** - Standardized data message formats for Redis Streams.
 - **`pkg/config/`** - Configuration management with validation
 - **`pkg/logger/`** - Structured logging with logrus
 - **`pkg/limiter/`** - Intelligent rate limiting and error classification
-- **`pkg/timing/`** - Market time detection and trading hours
 - **`pkg/testkit/`** - Comprehensive test utilities
 - **`tests/`** - System/E2E tests
+
+### Distributed Architecture & Data Flow
+
+The system is evolving into a distributed architecture using Redis Streams as a message bus.
+
+1.  **Data Producer (`cmd/fetcher`)**: This is the primary service for data acquisition.
+    - It loads job configurations from `config/jobs.yaml`.
+    - It uses providers from `pkg/provider/` (e.g., `tencent`, `sina`) to fetch real-time stock data.
+    - Providers are enhanced with decorators (`pkg/provider/decorators`) for caching, rate limiting, etc.
+    - Fetched data is standardized into a `message.MessageFormat` (`pkg/message/`).
+    - The final message is published to a Redis Stream (e.g., `stock:stream:stock_realtime`).
+
+2.  **Data Consumers (e.g., `cmd/api_server`)**: Other services connect to Redis and consume data from the streams for their specific purposes (e.g., serving API requests, storing in a database).
+
+3.  **Decoupling**: This producer/consumer model decouples data acquisition from data delivery, improving scalability and resilience.
 
 ## Development Workflows
 
 ### Build & Run Commands
 ```bash
-# Main application
+# Main application (legacy)
 go run ./cmd/stocksub
+
+# Fetcher (primary data producer)
+go run ./cmd/fetcher --config config/jobs.yaml --redis localhost:6379
+
 # API Monitoring (long-term data collection)
 go run ./cmd/api_monitor -symbols=600000,000001 -duration=5m -interval=3s
 go run ./cmd/api_monitor -symbols=600000 -duration=24h -data-dir=./collected_data

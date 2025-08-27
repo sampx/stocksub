@@ -42,12 +42,12 @@ services:
     networks:
       - stocksub-dev-network
 
-  provider-node:
+  fetcher:
     build:
       context: .
-      dockerfile: ./cmd/provider_node/Dockerfile
-    container_name: stocksub-provider-node-dev
-    command: ["/app/provider_node", "--config", "/app/config/jobs.yaml", "--redis-pass", "dev_redis_pass", "--redis", "redis:6379", "--log-format", "json"]
+      dockerfile: ./cmd/fetcher/Dockerfile
+    container_name: stocksub-fetcher-dev
+    command: ["/app/fetcher", "--config", "/app/config/jobs.yaml", "--redis-pass", "dev_redis_pass", "--redis", "redis:6379", "--log-format", "json"]
     volumes:
       - ./config:/app/config
       - ./_data:/app/_data

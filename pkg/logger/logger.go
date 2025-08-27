@@ -7,6 +7,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type Entry = logrus.Entry
+
 var (
 	// Logger 全局日志实例
 	Logger *logrus.Logger

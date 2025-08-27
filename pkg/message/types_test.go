@@ -107,7 +107,7 @@ func TestMessageFormat_ToJSON_FromJSON(t *testing.T) {
 	assert.Equal(t, 10.5, payloadItem["price"])
 
 	// 由于 JSON 序列化会改变数据结构，我们需要重新计算校验和
-	parsedMsg.Checksum = parsedMsg.calculateChecksum()
+	parsedMsg.Checksum = parsedMsg.CalculateChecksum()
 	err = parsedMsg.Validate()
 	assert.NoError(t, err)
 }

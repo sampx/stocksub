@@ -28,12 +28,12 @@ func Default() {
 	fmt.Println("  mage testIntegration - 运行集成测试")
 	fmt.Println("  mage benchmark   - 运行性能基准测试")
 	fmt.Println("  mage docker:up  - 启动基础环境 (Redis + InfluxDB)")
-	fmt.Println("  mage docker:upAll - 启动所有服务")
-	fmt.Println("  mage docker:upApps - 启动所有应用服务")
-	fmt.Println("  mage docker:upProvider - 启动数据提供节点")
-	fmt.Println("  mage docker:upRedisCollector - 启动 Redis 收集器")
-	fmt.Println("  mage docker:upInfluxCollector - 启动 InfluxDB 收集器")
-	fmt.Println("  mage docker:upApiServer - 启动 API 服务器")
+	fmt.Println("  mage docker:upall - 启动所有服务")
+	fmt.Println("  mage docker:upapps - 启动所有应用服务")
+	fmt.Println("  mage docker:fetcher - 启动数据提供节点")
+	fmt.Println("  mage docker:rediscollector - 启动 Redis 收集器")
+	fmt.Println("  mage docker:influxcollector - 启动 InfluxDB 收集器")
+	fmt.Println("  mage docker:apiserver - 启动 API 服务器")
 	fmt.Println("  mage docker:down - 停止所有服务")
 	fmt.Println("  mage clean       - 清理构建产物")
 	fmt.Println("  mage lint        - 运行代码检查")
@@ -50,13 +50,11 @@ func Build() error {
 		path string
 	}{
 		{"stocksub", "./cmd/stocksub"},
+		{"fetcher", "./cmd/fetcher"},
 		{"api_monitor", "./cmd/api_monitor"},
-		{"provider_node", "./cmd/provider_node"},
-		{"logging_collector", "./cmd/logging_collector"},
-		{"config_migrator", "./cmd/config_migrator"},
-		{"influxdb_collector", "./cmd/influxdb_collector"},
-		{"redis_collector", "./cmd/redis_collector"},
 		{"api_server", "./cmd/api_server"},
+		{"redis_collector", "./cmd/redis_collector"},
+		{"influxdb_collector", "./cmd/influxdb_collector"},
 	}
 
 	fmt.Println("🚀 开始构建 StockSub 组件...")
@@ -189,10 +187,10 @@ func (Docker) UpAll() error {
 	return sh.RunV("docker-compose", "-f", "docker-compose.dev.yml", "-p", "stocksub-dev", "up", "-d", "--build")
 }
 
-// UpProvider 启动数据提供节点
-func (Docker) Provider() error {
+// ProviderNode 启动数据提供节点
+func (Docker) Fetcher() error {
 	fmt.Println("🚀 启动数据提供节点...")
-	return sh.RunV("docker-compose", "-f", "docker-compose.dev.yml", "-p", "stocksub-dev", "up", "-d", "--build", "provider-node")
+	return sh.RunV("docker-compose", "-f", "docker-compose.dev.yml", "-p", "stocksub-dev", "up", "-d", "--build", "fetcher")
 }
 
 // UpRedisCollector 启动 Redis 收集器
@@ -216,7 +214,7 @@ func (Docker) ApiServer() error {
 // UpApps 启动所有应用服务（不包括基础环境）
 func (Docker) UpApps() error {
 	fmt.Println("🚀 启动所有应用服务...")
-	return sh.RunV("docker-compose", "-f", "docker-compose.dev.yml", "-p", "stocksub-dev", "up", "-d", "--build", "provider-node", "redis-collector", "influxdb-collector", "api-server")
+	return sh.RunV("docker-compose", "-f", "docker-compose.dev.yml", "-p", "stocksub-dev", "up", "-d", "--build", "fetcher", "redis-collector", "influxdb-collector", "api-server")
 }
 
 // Down 停止所有开发环境服务

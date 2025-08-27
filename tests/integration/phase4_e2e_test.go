@@ -1,7 +1,6 @@
 //go:build integration
-// +build integration
 
-package integration
+package integration_test
 
 import (
 	"context"
@@ -33,7 +32,7 @@ func TestPhase4EndToEnd(t *testing.T) {
 	}()
 
 	t.Run("CompleteDataFlow", func(t *testing.T) {
-		// Step 1: Simulate provider_node publishing data
+		// Step 1: Simulate fetcher publishing data
 		stockData := []message.StockData{
 			{
 				Symbol:        "600000",
@@ -42,7 +41,7 @@ func TestPhase4EndToEnd(t *testing.T) {
 				Change:        0.15,
 				ChangePercent: 1.45,
 				Volume:        1250000,
-				Timestamp:     time.Now(),
+				Timestamp:     time.Now().Format(time.RFC3339),
 			},
 			{
 				Symbol:        "000001",
@@ -51,7 +50,7 @@ func TestPhase4EndToEnd(t *testing.T) {
 				Change:        -0.30,
 				ChangePercent: -1.94,
 				Volume:        2100000,
-				Timestamp:     time.Now(),
+				Timestamp:     time.Now().Format(time.RFC3339),
 			},
 		}
 
@@ -83,7 +82,7 @@ func TestPhase4EndToEnd(t *testing.T) {
 		msgData, err := json.Marshal(msgFormat)
 		require.NoError(t, err)
 
-		// Publish to Redis stream (simulating provider_node)
+		// Publish to Redis stream (simulating fetcher)
 		streamName := "stream:stock:realtime"
 		_, err = redisClient.XAdd(ctx, &redis.XAddArgs{
 			Stream: streamName,
@@ -121,11 +120,13 @@ func TestPhase4EndToEnd(t *testing.T) {
 		var receivedMsg message.MessageFormat
 		err = json.Unmarshal([]byte(data), &receivedMsg)
 		require.NoError(t, err)
-		require.True(t, receivedMsg.VerifyChecksum())
+		require.NoError(t, receivedMsg.Validate())
 
 		// Parse stock data
 		var receivedStockData []message.StockData
-		err = json.Unmarshal(receivedMsg.Payload, &receivedStockData)
+		payloadBytes, ok := receivedMsg.Payload.([]byte)
+		require.True(t, ok)
+		err = json.Unmarshal(payloadBytes, &receivedStockData)
 		require.NoError(t, err)
 		require.Len(t, receivedStockData, 2)
 
@@ -141,7 +142,7 @@ func TestPhase4EndToEnd(t *testing.T) {
 				"change":         stock.Change,
 				"change_percent": stock.ChangePercent,
 				"volume":         stock.Volume,
-				"timestamp":      stock.Timestamp.Unix(),
+				"timestamp":      parseTimestamp(stock.Timestamp),
 				"provider":       receivedMsg.Metadata.Provider,
 				"market":         receivedMsg.Metadata.Market,
 				"updated_at":     time.Now().Unix(),
@@ -317,7 +318,7 @@ func TestPhase4EndToEnd(t *testing.T) {
 				Change:        0.15,
 				ChangePercent: 1.45,
 				Volume:        1250000,
-				Timestamp:     time.Now(),
+				Timestamp:     time.Now().Format(time.RFC3339),
 			},
 		}
 
@@ -346,7 +347,9 @@ func TestPhase4EndToEnd(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			// Simulate redis_collector processing
 			var receivedStockData []message.StockData
-			err = json.Unmarshal(msgFormat.Payload, &receivedStockData)
+			payloadBytes, ok := msgFormat.Payload.([]byte)
+			require.True(t, ok)
+			err = json.Unmarshal(payloadBytes, &receivedStockData)
 			require.NoError(t, err)
 
 			// Store data (this should be idempotent)
@@ -360,7 +363,7 @@ func TestPhase4EndToEnd(t *testing.T) {
 					"change":         stock.Change,
 					"change_percent": stock.ChangePercent,
 					"volume":         stock.Volume,
-					"timestamp":      stock.Timestamp.Unix(),
+					"timestamp":      parseTimestamp(stock.Timestamp),
 					"provider":       msgFormat.Metadata.Provider,
 					"market":         msgFormat.Metadata.Market,
 					"updated_at":     time.Now().Unix(),
@@ -436,7 +439,7 @@ func TestPhase4EndToEnd(t *testing.T) {
 				Symbol:    "600000",
 				Name:      "测试股票",
 				Price:     10.0,
-				Timestamp: time.Now(),
+				Timestamp: time.Now().Format(time.RFC3339),
 			},
 		}
 
@@ -488,7 +491,7 @@ func TestPhase4EndToEnd(t *testing.T) {
 			}
 
 			// Verify checksum
-			if !msgFormat.VerifyChecksum() {
+			if err := msgFormat.Validate(); err != nil {
 				errorCount++
 				err = redisClient.XAck(ctx, streamName, consumerGroup, msg.ID).Err()
 				require.NoError(t, err)
@@ -519,4 +522,13 @@ func parseFloat(s string) float64 {
 		return result
 	}
 	return 0.0
+}
+
+// Helper function to parse timestamp string to Unix timestamp
+func parseTimestamp(timestampStr string) int64 {
+	t, err := time.Parse(time.RFC3339, timestampStr)
+	if err != nil {
+		return time.Now().Unix()
+	}
+	return t.Unix()
 }

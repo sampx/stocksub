@@ -13,11 +13,11 @@ type APIMonitorCompatibilityConfig struct {
 	// SkipMarketTimeCheck 是否跳过市场时间检查
 	// 设置为 true 时可以在非交易时间进行测试
 	SkipMarketTimeCheck bool `yaml:"skip_market_time_check"`
-	
+
 	// ForceTestMode 强制测试模式
 	// 设置为 true 时禁用所有安全检查，仅用于开发测试
 	ForceTestMode bool `yaml:"force_test_mode"`
-	
+
 	// MaxTestDuration 测试模式下的最大运行时间
 	// 避免测试模式下的无限运行
 	MaxTestDuration time.Duration `yaml:"max_test_duration"`
@@ -45,12 +45,12 @@ func NewCompatibleIntelligentLimiter(marketTime *timing.MarketTime, config APIMo
 func (c *CompatibleIntelligentLimiter) InitializeBatch(symbols []string) {
 	c.initialized = true
 	c.startTime = time.Now()
-	
+
 	if c.config.ForceTestMode {
 		// 测试模式：直接标记为已初始化，跳过原始限制器
 		return
 	}
-	
+
 	// 正常模式：使用原始限制器
 	c.originalLimiter.InitializeBatch(symbols)
 }
@@ -60,7 +60,7 @@ func (c *CompatibleIntelligentLimiter) ShouldProceed(ctx context.Context) (bool,
 	if !c.initialized {
 		return false, fmt.Errorf("limiter not initialized")
 	}
-	
+
 	// 强制测试模式：跳过所有检查但限制运行时间
 	if c.config.ForceTestMode {
 		if c.config.MaxTestDuration > 0 && time.Since(c.startTime) > c.config.MaxTestDuration {
@@ -68,13 +68,13 @@ func (c *CompatibleIntelligentLimiter) ShouldProceed(ctx context.Context) (bool,
 		}
 		return true, nil
 	}
-	
+
 	// 跳过市场时间检查模式
 	if c.config.SkipMarketTimeCheck {
 		// 仍然使用原始限制器的其他逻辑，但跳过交易时间检查
 		return c.shouldProceedWithoutMarketCheck(ctx)
 	}
-	
+
 	// 正常模式：完全使用原始限制器
 	return c.originalLimiter.ShouldProceed(ctx)
 }
@@ -84,11 +84,11 @@ func (c *CompatibleIntelligentLimiter) RecordResult(err error, data []string) (b
 	// 强制测试模式：简化结果处理
 	if c.config.ForceTestMode {
 		if err != nil {
-			return false, 2*time.Second, nil // 简单重试逻辑
+			return false, 2 * time.Second, nil // 简单重试逻辑
 		}
 		return true, 0, nil
 	}
-	
+
 	// 正常模式：使用原始限制器
 	return c.originalLimiter.RecordResult(err, data)
 }
@@ -97,19 +97,19 @@ func (c *CompatibleIntelligentLimiter) RecordResult(err error, data []string) (b
 func (c *CompatibleIntelligentLimiter) shouldProceedWithoutMarketCheck(ctx context.Context) (bool, error) {
 	// 这里我们需要手动实现原始限制器的非市场时间相关逻辑
 	// 由于原始限制器的内部状态是私有的，我们提供一个简化版本
-	
+
 	// 检查上下文是否被取消
 	select {
 	case <-ctx.Done():
 		return false, ctx.Err()
 	default:
 	}
-	
+
 	// 检查运行时间限制（如果设置了）
 	if c.config.MaxTestDuration > 0 && time.Since(c.startTime) > c.config.MaxTestDuration {
 		return false, fmt.Errorf("test duration limit reached")
 	}
-	
+
 	return true, nil
 }
 
@@ -120,10 +120,10 @@ type APIMonitorTestingHelper struct{}
 func (h *APIMonitorTestingHelper) CreateTestCompatibleLimiter(marketTime *timing.MarketTime) *CompatibleIntelligentLimiter {
 	config := APIMonitorCompatibilityConfig{
 		SkipMarketTimeCheck: true,
-		ForceTestMode:       false, // 保留其他安全检查
+		ForceTestMode:       false,            // 保留其他安全检查
 		MaxTestDuration:     10 * time.Minute, // 测试限制为10分钟
 	}
-	
+
 	return NewCompatibleIntelligentLimiter(marketTime, config)
 }
 
@@ -131,10 +131,10 @@ func (h *APIMonitorTestingHelper) CreateTestCompatibleLimiter(marketTime *timing
 func (h *APIMonitorTestingHelper) CreateDevCompatibleLimiter(marketTime *timing.MarketTime) *CompatibleIntelligentLimiter {
 	config := APIMonitorCompatibilityConfig{
 		SkipMarketTimeCheck: true,
-		ForceTestMode:       true, // 开发模式：跳过所有检查
+		ForceTestMode:       true,             // 开发模式：跳过所有检查
 		MaxTestDuration:     30 * time.Minute, // 开发限制为30分钟
 	}
-	
+
 	return NewCompatibleIntelligentLimiter(marketTime, config)
 }
 

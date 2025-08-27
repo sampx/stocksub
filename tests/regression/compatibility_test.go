@@ -1,4 +1,4 @@
-package regression
+package integration_test
 
 import (
 	"context"

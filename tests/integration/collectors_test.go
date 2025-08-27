@@ -1,7 +1,6 @@
 //go:build integration
-// +build integration
 
-package integration
+package integration_test
 
 import (
 	"context"
@@ -42,7 +41,7 @@ func TestCollectorsIntegration(t *testing.T) {
 				Change:        0.15,
 				ChangePercent: 1.45,
 				Volume:        1250000,
-				Timestamp:     time.Now(),
+				Timestamp:     time.Now().Format(time.RFC3339),
 			},
 		}
 
@@ -93,7 +92,7 @@ func TestCollectorsIntegration(t *testing.T) {
 		var receivedMsg message.MessageFormat
 		err = json.Unmarshal([]byte(messages[0].Values["data"].(string)), &receivedMsg)
 		require.NoError(t, err)
-		assert.True(t, receivedMsg.VerifyChecksum())
+		assert.NoError(t, receivedMsg.Validate())
 		assert.Equal(t, "stock_realtime", receivedMsg.Metadata.DataType)
 	})
 

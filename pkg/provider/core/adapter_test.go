@@ -11,11 +11,11 @@ import (
 
 // mockLegacyProvider 模拟旧版 Provider
 type mockLegacyProvider struct {
-	name         string
-	rateLimit    time.Duration
+	name          string
+	rateLimit     time.Duration
 	supportedSyms map[string]bool
-	mockData     []subscriber.StockData
-	mockError    error
+	mockData      []subscriber.StockData
+	mockError     error
 }
 
 func (m *mockLegacyProvider) Name() string {

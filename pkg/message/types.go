@@ -110,13 +110,13 @@ func NewMessageFormat(producer, provider, dataType string, payload interface{}) 
 	}
 
 	// 计算校验和
-	msg.Checksum = msg.calculateChecksum()
+	msg.Checksum = msg.CalculateChecksum()
 
 	return msg
 }
 
-// calculateChecksum 计算消息校验和
-func (m *MessageFormat) calculateChecksum() string {
+// CalculateChecksum 计算消息校验和
+func (m *MessageFormat) CalculateChecksum() string {
 	// 创建消息副本，排除 checksum 字段
 	temp := MessageFormat{
 		Header:   m.Header,
@@ -135,7 +135,7 @@ func (m *MessageFormat) calculateChecksum() string {
 
 // Validate 验证消息完整性
 func (m *MessageFormat) Validate() error {
-	expectedChecksum := m.calculateChecksum()
+	expectedChecksum := m.CalculateChecksum()
 	if m.Checksum != expectedChecksum {
 		return ErrInvalidChecksum
 	}
@@ -179,5 +179,5 @@ func (m *MessageFormat) SetMarketInfo(market, tradingSession string) {
 	m.Metadata.Market = market
 	m.Metadata.TradingSession = tradingSession
 	// 重新计算校验和
-	m.Checksum = m.calculateChecksum()
+	m.Checksum = m.CalculateChecksum()
 }

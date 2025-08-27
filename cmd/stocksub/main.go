@@ -51,7 +51,7 @@ func main() {
 		decoratedProvider = tencentProvider // 回退
 	} else {
 		log.Infof("装饰器应用成功: %s", decoratedProvider.Name())
-		
+
 		// 输出装饰器状态信息
 		if statusProvider, ok := decoratedProvider.(interface{ GetStatus() map[string]interface{} }); ok {
 			status := statusProvider.GetStatus()
@@ -127,12 +127,12 @@ func main() {
 
 	log.Infof("收到退出信号，正在关闭...")
 	manager.Stop()
-	
+
 	// 清理 ProviderManager
 	if err := providerManager.Close(); err != nil {
 		log.Warnf("Error closing provider manager: %v", err)
 	}
-	
+
 	log.Infof("已退出")
 }
 

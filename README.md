@@ -70,7 +70,7 @@ curl http://localhost:8080/health
 curl http://localhost:8080/stocks/600000
 
 # 查看实时数据流
-docker logs -f stocksub-provider-node-dev
+docker logs -f stocksub-fetcher-dev
 ```
 
 ### API 客户端使用（推荐）
@@ -232,13 +232,12 @@ graph TB
 ```
 stocksub/
 ├── cmd/                          # 微服务应用
-│   ├── provider_node/           # 数据采集节点
+│   ├── fetcher/                 # 数据采集节点
 │   ├── api_server/              # API 服务器
 │   ├── influxdb_collector/      # InfluxDB 收集器
 │   ├── redis_collector/         # Redis 收集器
 │   ├── api_monitor/             # API 监控器
 │   ├── logging_collector/       # 日志收集器
-│   ├── config_migrator/         # 配置迁移工具
 │   └── stocksub/               # 兼容性主程序
 ├── pkg/                         # 核心库
 │   ├── provider/               # 数据提供商
@@ -423,13 +422,13 @@ mage deploy                 # 部署到生产环境
 
 ```bash
 # 构建所有服务
-go build -o dist/provider_node ./cmd/provider_node
+go build -o dist/fetcher ./cmd/fetcher
 go build -o dist/api_server ./cmd/api_server
 go build -o dist/influxdb_collector ./cmd/influxdb_collector
 go build -o dist/redis_collector ./cmd/redis_collector
 
 # 单独运行服务
-./dist/provider_node --config config/jobs.yaml
+./dist/fetcher --config config/jobs.yaml
 ./dist/api_server --config config/api_server.yaml
 ./dist/influxdb_collector --config config/influxdb_collector.yaml
 ./dist/redis_collector --config config/redis_collector.yaml

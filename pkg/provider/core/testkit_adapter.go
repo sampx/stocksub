@@ -89,10 +89,10 @@ func NewSmartProviderAdapter(provider interface{}) *SmartProviderAdapter {
 	adapter := &SmartProviderAdapter{
 		provider: provider,
 	}
-	
+
 	// 自动适配
 	adapter.adapted = adapter.autoAdapt()
-	
+
 	return adapter
 }
 

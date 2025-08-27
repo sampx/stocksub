@@ -24,7 +24,7 @@ type Provider struct {
 	requestMu   sync.Mutex
 	userAgent   string
 	log         *logrus.Entry
-	
+
 	// 配置选项 - 为了向后兼容保留，但不在内部使用
 	rateLimit  time.Duration
 	maxRetries int
@@ -44,9 +44,9 @@ func NewProvider() *Provider {
 			},
 			Timeout: 15 * time.Second,
 		},
-		userAgent:  "StockSub/1.0",
-		log:        logger.WithComponent("TencentProvider"),
-		
+		userAgent: "StockSub/1.0",
+		log:       logger.WithComponent("TencentProvider"),
+
 		// 默认配置值，保持向后兼容
 		rateLimit:  200 * time.Millisecond,
 		maxRetries: 3,
