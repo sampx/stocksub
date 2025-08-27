@@ -45,8 +45,12 @@ func Build() error {
 	}{
 		{"stocksub", "./cmd/stocksub"},
 		{"api_monitor", "./cmd/api_monitor"},
-		// {"api_analyzer", "./cmd/api_analyzer"},  // 目录为空，暂时注释
-		// {"data_exporter", "./cmd/data_exporter"},  // 目录为空，暂时注释
+		{"provider_node", "./cmd/provider_node"},
+		{"logging_collector", "./cmd/logging_collector"},
+		{"config_migrator", "./cmd/config_migrator"},
+		{"influxdb_collector", "./cmd/influxdb_collector"},
+		{"redis_collector", "./cmd/redis_collector"},
+		{"api_server", "./cmd/api_server"},
 	}
 
 	fmt.Println("🚀 开始构建 StockSub 组件...")

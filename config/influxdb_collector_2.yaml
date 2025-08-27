@@ -1,0 +1,18 @@
+# InfluxDB Collector Configuration - Instance 2
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+influxdb:
+  url: "http://localhost:8086"
+  token: ""
+  org: "stocksub"
+  bucket: "stock_data"
+
+consumer:
+  group: "influxdb_collectors"  # 相同消费者组，实现负载均衡
+  name: "influxdb_collector_2"  # 不同的消费者名称
+  streams:
+    - "stream:stock:realtime"
+    - "stream:index:realtime"

@@ -1,0 +1,17 @@
+# Redis Collector Configuration
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+consumer:
+  group: "redis_collectors"
+  name: "redis_collector_1"
+  streams:
+    - "stream:stock:realtime"
+    - "stream:index:realtime"
+
+storage:
+  key_prefix: "latest:"
+  ttl: 3600  # 1 hour in seconds

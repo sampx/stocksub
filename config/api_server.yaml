@@ -1,0 +1,21 @@
+# API Server Configuration
+server:
+  port: "8080"
+  mode: "release"  # debug, release, test
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+influxdb:
+  url: "http://localhost:8086"
+  token: ""
+  org: "stocksub"
+  bucket: "stock_data"
+
+cache:
+  enabled: true
+  default_ttl: "5m"
+  max_size: 1000
+  cleanup_interval: "1m"

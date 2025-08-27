@@ -1,0 +1,18 @@
+# InfluxDB Collector Configuration
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+influxdb:
+  url: "http://localhost:8086"
+  token: ""
+  org: "stocksub"
+  bucket: "stock_data"
+
+consumer:
+  group: "influxdb_collectors"
+  name: "influxdb_collector_1"
+  streams:
+    - "stream:stock:realtime"
+    - "stream:index:realtime"
