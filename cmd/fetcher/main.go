@@ -74,7 +74,7 @@ func main() {
 	tencentProvider := tencent.NewClient()
 
 	// 应用装饰器
-	decoratedProvider, err := decorators.ApplyDefaultDecorators(tencentProvider)
+	decoratedProvider, err := decorators.CreateDecoratedProvider(tencentProvider, decorators.DefaultDecoratorConfig())
 	if err != nil {
 		log.Warnf("应用腾讯提供商装饰器失败: %v，使用原始提供商", err)
 		decoratedProvider = tencentProvider
@@ -82,8 +82,13 @@ func main() {
 		log.Debug("腾讯提供商装饰器应用成功")
 	}
 
-	if err := providerManager.RegisterRealtimeStockProvider("tencent", decoratedProvider); err != nil {
-		log.Errorf("注册腾讯提供商失败: %v", err)
+	if realtimeProvider, ok := decoratedProvider.(provider.RealtimeStockProvider); ok {
+		if err := providerManager.RegisterRealtimeStockProvider("tencent", realtimeProvider); err != nil {
+			log.Errorf("注册腾讯提供商失败: %v", err)
+			os.Exit(1)
+		}
+	} else {
+		log.Error("装饰后的腾讯提供商未实现 RealtimeStockProvider 接口")
 		os.Exit(1)
 	}
 	log.Info("腾讯数据提供商注册成功")
@@ -91,15 +96,20 @@ func main() {
 	// 注册新浪提供商
 	log.Debug("创建新浪数据提供商")
 	sinaProvider := sina.NewClient()
-	decoratedSinaProvider, err := decorators.ApplyDefaultDecorators(sinaProvider)
+	decoratedSinaProvider, err := decorators.CreateDecoratedProvider(sinaProvider, decorators.DefaultDecoratorConfig())
 	if err != nil {
 		log.Warnf("应用新浪提供商装饰器失败: %v，使用原始提供商", err)
 		decoratedSinaProvider = sinaProvider
 	} else {
 		log.Debug("新浪提供商装饰器应用成功")
 	}
-	if err := providerManager.RegisterRealtimeStockProvider("sina", decoratedSinaProvider); err != nil {
-		log.Errorf("注册新浪提供商失败: %v", err)
+	if realtimeSinaProvider, ok := decoratedSinaProvider.(provider.RealtimeStockProvider); ok {
+		if err := providerManager.RegisterRealtimeStockProvider("sina", realtimeSinaProvider); err != nil {
+			log.Errorf("注册新浪提供商失败: %v", err)
+			os.Exit(1)
+		}
+	} else {
+		log.Error("装饰后的新浪提供商未实现 RealtimeStockProvider 接口")
 		os.Exit(1)
 	}
 	log.Info("新浪数据提供商注册成功")

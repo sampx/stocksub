@@ -11,16 +11,14 @@ import (
 
 	"stocksub/pkg/core"
 	"stocksub/pkg/logger"
-	"stocksub/pkg/provider"
 )
 
 // Client 腾讯股票数据提供商 - 简化版
 // 专注于核心数据获取功能，频率控制等横切关注点通过装饰器处理
 type Client struct {
-	provider.RealtimeStockProvider // 实现核心Provider接口
-	httpClient                     *http.Client
-	userAgent                      string
-	log                            *logger.Entry
+	httpClient *http.Client
+	userAgent  string
+	log        *logger.Entry
 }
 
 // NewClient 创建腾讯数据提供商

@@ -8,71 +8,49 @@ import (
 	"github.com/spf13/viper"
 )
 
-// DecoratorType 装饰器类型枚举
-type DecoratorType string
-
-const (
-	FrequencyControlType DecoratorType = "frequency_control"
-	CircuitBreakerType   DecoratorType = "circuit_breaker"
-)
-
 // ConfigurableDecoratorChain 可配置的装饰器链
 type ConfigurableDecoratorChain struct {
-	decorators []DecoratorConfig
-	factory    *DecoratorFactory
-}
-
-// DecoratorConfig 装饰器配置
-type DecoratorConfig struct {
-	Type     DecoratorType          `yaml:"type" mapstructure:"type"`
-	Enabled  bool                   `yaml:"enabled" mapstructure:"enabled"`
-	Priority int                    `yaml:"priority" mapstructure:"priority"` // 优先级，数值越小越先应用
-	Config   map[string]interface{} `yaml:"config" mapstructure:"config"`
-}
-
-// ProviderDecoratorConfig 提供商装饰器完整配置
-type ProviderDecoratorConfig struct {
-	Decorators []DecoratorConfig `yaml:"decorators" mapstructure:"decorators"`
+	decorators []provider.DecoratorConfig
 }
 
 // NewConfigurableDecoratorChain 创建可配置装饰器链
-func NewConfigurableDecoratorChain(factory *DecoratorFactory) *ConfigurableDecoratorChain {
-	return &ConfigurableDecoratorChain{
-		decorators: make([]DecoratorConfig, 0),
-		factory:    factory,
-	}
+func NewConfigurableDecoratorChain() *ConfigurableDecoratorChain {
+	return &ConfigurableDecoratorChain{}
 }
 
 // LoadFromViper 从 Viper 配置加载装饰器链配置
 func (cdc *ConfigurableDecoratorChain) LoadFromViper(v *viper.Viper, configKey string) error {
-	var config ProviderDecoratorConfig
+	var config provider.ProviderDecoratorConfig
 	if err := v.UnmarshalKey(configKey, &config); err != nil {
 		return fmt.Errorf("无法解析装饰器配置: %w", err)
 	}
 
-	cdc.decorators = config.Decorators
+	cdc.LoadFromConfig(config)
 	return nil
 }
 
 // LoadFromConfig 从配置结构体加载装饰器链配置
-func (cdc *ConfigurableDecoratorChain) LoadFromConfig(config ProviderDecoratorConfig) {
-	cdc.decorators = config.Decorators
+func (cdc *ConfigurableDecoratorChain) LoadFromConfig(config provider.ProviderDecoratorConfig) {
+	cdc.decorators = append(cdc.decorators, config.All...)
+	cdc.decorators = append(cdc.decorators, config.Realtime...)
+	cdc.decorators = append(cdc.decorators, config.Historical...)
+	cdc.decorators = append(cdc.decorators, config.Index...)
 }
 
 // AddDecorator 添加装饰器配置
-func (cdc *ConfigurableDecoratorChain) AddDecorator(decoratorConfig DecoratorConfig) {
+func (cdc *ConfigurableDecoratorChain) AddDecorator(decoratorConfig provider.DecoratorConfig) {
 	cdc.decorators = append(cdc.decorators, decoratorConfig)
 }
 
 // Apply 将装饰器链应用到指定的 RealtimeStockProvider
-func (cdc *ConfigurableDecoratorChain) Apply(provider provider.Provider) (provider.Provider, error) {
+func (cdc *ConfigurableDecoratorChain) Apply(p provider.Provider) (provider.Provider, error) {
 	// 按优先级排序装饰器
-	sortedDecorators := cdc.getSortedEnabledDecorators()
+	sortedDecorators := cdc.getSortedEnabledDecorators(p)
 
 	// 逐个应用装饰器
-	current := provider
+	current := p
 	for _, decoratorConfig := range sortedDecorators {
-		decorated, err := cdc.factory.CreateRealtimeStockDecorator(decoratorConfig.Type, current, decoratorConfig.Config)
+		decorated, err := CreateDecorator(decoratorConfig.Type, current, decoratorConfig.Config)
 		if err != nil {
 			return nil, fmt.Errorf("无法创建装饰器 %s: %w", decoratorConfig.Type, err)
 		}
@@ -83,12 +61,22 @@ func (cdc *ConfigurableDecoratorChain) Apply(provider provider.Provider) (provid
 }
 
 // getSortedEnabledDecorators 获取按优先级排序的已启用装饰器
-func (cdc *ConfigurableDecoratorChain) getSortedEnabledDecorators() []DecoratorConfig {
-	enabled := make([]DecoratorConfig, 0)
+func (cdc *ConfigurableDecoratorChain) getSortedEnabledDecorators(p provider.Provider) []provider.DecoratorConfig {
+	enabled := make([]provider.DecoratorConfig, 0)
+	var providerType string
+
+	switch p.(type) {
+	case provider.RealtimeStockProvider:
+		providerType = "realtime"
+	case provider.HistoricalProvider:
+		providerType = "historical"
+	case provider.RealtimeIndexProvider:
+		providerType = "index"
+	}
 
 	// 过滤出启用的装饰器
 	for _, decorator := range cdc.decorators {
-		if decorator.Enabled {
+		if decorator.Enabled && (decorator.ProviderType == "all" || decorator.ProviderType == "" || decorator.ProviderType == providerType) {
 			enabled = append(enabled, decorator)
 		}
 	}
@@ -106,29 +94,29 @@ func (cdc *ConfigurableDecoratorChain) getSortedEnabledDecorators() []DecoratorC
 }
 
 // GetAppliedDecorators 获取将要应用的装饰器列表
-func (cdc *ConfigurableDecoratorChain) GetAppliedDecorators() []DecoratorType {
-	sorted := cdc.getSortedEnabledDecorators()
-	types := make([]DecoratorType, len(sorted))
+func (cdc *ConfigurableDecoratorChain) GetAppliedDecorators(p provider.Provider) []provider.DecoratorType {
+	sorted := cdc.getSortedEnabledDecorators(p)
+	types := make([]provider.DecoratorType, len(sorted))
 	for i, decorator := range sorted {
 		types[i] = decorator.Type
 	}
 	return types
 }
 
-// 增强的装饰器工厂，支持配置驱动创建
-func (df *DecoratorFactory) CreateRealtimeStockDecorator(decoratorType DecoratorType, stockProvider provider.RealtimeStockProvider, config map[string]interface{}) (provider.RealtimeStockProvider, error) {
+// CreateDecorator 支持配置驱动创建
+func CreateDecorator(decoratorType provider.DecoratorType, p provider.Provider, config map[string]interface{}) (provider.Provider, error) {
 	switch decoratorType {
-	case FrequencyControlType:
-		return df.createFrequencyControlProvider(stockProvider, config)
-	case CircuitBreakerType:
-		return df.createCircuitBreakerProvider(stockProvider, config)
+	case provider.FrequencyControlType:
+		return createFrequencyControlProvider(p, config)
+	case provider.CircuitBreakerType:
+		return createCircuitBreakerProvider(p, config)
 	default:
 		return nil, fmt.Errorf("不支持的装饰器类型: %s", decoratorType)
 	}
 }
 
 // createFrequencyControlProvider 创建频率控制装饰器
-func (df *DecoratorFactory) createFrequencyControlProvider(provider provider.Provider, configMap map[string]interface{}) (provider.Provider, error) {
+func createFrequencyControlProvider(prov provider.Provider, configMap map[string]interface{}) (provider.Provider, error) {
 	config := &FrequencyControlConfig{
 		MinInterval: 200 * time.Millisecond, // 默认值
 		MaxRetries:  3,
@@ -152,12 +140,19 @@ func (df *DecoratorFactory) createFrequencyControlProvider(provider provider.Pro
 			config.Enabled = enabled
 		}
 	}
-
-	return NewFrequencyControlProvider(provider, config), nil
+	switch p := prov.(type) {
+	case provider.RealtimeStockProvider:
+		return NewFrequencyControlProvider(p, config), nil
+	case provider.HistoricalProvider:
+		// 历史数据提供商可能不需要频率控制，或者有不同的实现
+		return NewFrequencyControlForHistoricalProvider(p, config), nil
+	default:
+		return nil, fmt.Errorf("不支持为类型 %T 应用频率控制装饰器", p)
+	}
 }
 
 // createCircuitBreakerProvider 创建熔断器装饰器
-func (df *DecoratorFactory) createCircuitBreakerProvider(stockProvider provider.RealtimeStockProvider, configMap map[string]interface{}) (provider.RealtimeStockProvider, error) {
+func createCircuitBreakerProvider(prov provider.Provider, configMap map[string]interface{}) (provider.Provider, error) {
 	config := DefaultCircuitBreakerConfig()
 
 	// 解析配置
@@ -185,22 +180,26 @@ func (df *DecoratorFactory) createCircuitBreakerProvider(stockProvider provider.
 			config.Enabled = enabled
 		}
 	}
-
-	return NewCircuitBreakerProvider(stockProvider, config), nil
+	switch p := prov.(type) {
+	case provider.RealtimeStockProvider:
+		return NewCircuitBreakerProvider(p, config), nil
+	case provider.HistoricalProvider:
+		return NewCircuitBreakerForHistoricalProvider(p, config), nil
+	default:
+		return nil, fmt.Errorf("不支持为类型 %T 应用熔断器装饰器", p)
+	}
 }
 
 // CreateDecoratedProvider 便捷方法：使用配置创建完全装饰的提供商
-func CreateDecoratedProvider(stockProvider provider.Provider, config ProviderDecoratorConfig) (provider.Provider, error) {
-	factory := NewDecoratorFactory()
-	chain := NewConfigurableDecoratorChain(factory)
+func CreateDecoratedProvider(stockProvider provider.Provider, config provider.ProviderDecoratorConfig) (provider.Provider, error) {
+	chain := NewConfigurableDecoratorChain()
 	chain.LoadFromConfig(config)
 	return chain.Apply(stockProvider)
 }
 
 // CreateDecoratedProviderFromViper 便捷方法：从 Viper 配置创建完全装饰的提供商
-func CreateDecoratedProviderFromViper(stockProvider provider.RealtimeStockProvider, v *viper.Viper, configKey string) (provider.RealtimeStockProvider, error) {
-	factory := NewDecoratorFactory()
-	chain := NewConfigurableDecoratorChain(factory)
+func CreateDecoratedProviderFromViper(stockProvider provider.Provider, v *viper.Viper, configKey string) (provider.Provider, error) {
+	chain := NewConfigurableDecoratorChain()
 
 	if err := chain.LoadFromViper(v, configKey); err != nil {
 		return nil, err
@@ -210,23 +209,14 @@ func CreateDecoratedProviderFromViper(stockProvider provider.RealtimeStockProvid
 }
 
 // DefaultDecoratorConfig 创建默认的装饰器配置
-func DefaultDecoratorConfig() ProviderDecoratorConfig {
-	return ProviderDecoratorConfig{
-		Decorators: []DecoratorConfig{
+func DefaultDecoratorConfig() provider.ProviderDecoratorConfig {
+	return provider.ProviderDecoratorConfig{
+		All: []provider.DecoratorConfig{
 			{
-				Type:     FrequencyControlType,
-				Enabled:  true,
-				Priority: 1, // 频率控制优先级高，先应用
-				Config: map[string]interface{}{
-					"min_interval_ms": 200,
-					"max_retries":     3,
-					"enabled":         true,
-				},
-			},
-			{
-				Type:     CircuitBreakerType,
-				Enabled:  true,
-				Priority: 2, // 熔断器优先级低，后应用
+				Type:         provider.CircuitBreakerType,
+				Enabled:      true,
+				Priority:     2,
+				ProviderType: "all",
 				Config: map[string]interface{}{
 					"name":          "StockProvider",
 					"max_requests":  5,
@@ -237,34 +227,64 @@ func DefaultDecoratorConfig() ProviderDecoratorConfig {
 				},
 			},
 		},
-	}
-}
-
-// ProductionDecoratorConfig 生产环境装饰器配置
-func ProductionDecoratorConfig() ProviderDecoratorConfig {
-	return ProviderDecoratorConfig{
-		Decorators: []DecoratorConfig{
+		Realtime: []provider.DecoratorConfig{
 			{
-				Type:     FrequencyControlType,
-				Enabled:  true,
-				Priority: 1,
+				Type:         provider.FrequencyControlType,
+				Enabled:      true,
+				Priority:     1,
+				ProviderType: "realtime",
 				Config: map[string]interface{}{
-					"min_interval_ms": 5000, // 生产环境更保守的频率限制
+					"min_interval_ms": 200,
 					"max_retries":     3,
 					"enabled":         true,
 				},
 			},
+		},
+	}
+}
+
+// ProductionDecoratorConfig 生产环境装饰器配置
+func ProductionDecoratorConfig() provider.ProviderDecoratorConfig {
+	return provider.ProviderDecoratorConfig{
+		All: []provider.DecoratorConfig{
 			{
-				Type:     CircuitBreakerType,
-				Enabled:  true,
-				Priority: 2,
+				Type:         provider.CircuitBreakerType,
+				Enabled:      true,
+				Priority:     2,
+				ProviderType: "all",
 				Config: map[string]interface{}{
 					"name":          "ProductionStockProvider",
 					"max_requests":  3,
 					"interval":      "120s",
 					"timeout":       "60s",
-					"ready_to_trip": 3, // 更敏感的熔断策略
+					"ready_to_trip": 3,
 					"enabled":       true,
+				},
+			},
+		},
+		Realtime: []provider.DecoratorConfig{
+			{
+				Type:         provider.FrequencyControlType,
+				Enabled:      true,
+				Priority:     1,
+				ProviderType: "realtime",
+				Config: map[string]interface{}{
+					"min_interval_ms": 5000,
+					"max_retries":     3,
+					"enabled":         true,
+				},
+			},
+		},
+		Historical: []provider.DecoratorConfig{
+			{
+				Type:         provider.FrequencyControlType,
+				Enabled:      true,
+				Priority:     1,
+				ProviderType: "historical",
+				Config: map[string]interface{}{
+					"min_interval_ms": 10000, // 历史数据使用更长的间隔
+					"max_retries":     5,
+					"enabled":         true,
 				},
 			},
 		},
@@ -272,24 +292,18 @@ func ProductionDecoratorConfig() ProviderDecoratorConfig {
 }
 
 // TestDecoratorConfig 测试环境装饰器配置
-func TestDecoratorConfig() ProviderDecoratorConfig {
-	return ProviderDecoratorConfig{
-		Decorators: []DecoratorConfig{
+func TestDecoratorConfig() provider.ProviderDecoratorConfig {
+	return provider.ProviderDecoratorConfig{
+		All: []provider.DecoratorConfig{
 			{
-				Type:     FrequencyControlType,
-				Enabled:  false, // 测试环境可以关闭频率限制
-				Priority: 1,
-				Config: map[string]interface{}{
-					"enabled": false,
-				},
+				Type:         provider.FrequencyControlType,
+				Enabled:      false,
+				ProviderType: "all",
 			},
 			{
-				Type:     CircuitBreakerType,
-				Enabled:  false, // 测试环境关闭熔断器
-				Priority: 2,
-				Config: map[string]interface{}{
-					"enabled": false,
-				},
+				Type:         provider.CircuitBreakerType,
+				Enabled:      false,
+				ProviderType: "all",
 			},
 		},
 	}
@@ -297,30 +311,34 @@ func TestDecoratorConfig() ProviderDecoratorConfig {
 
 // MonitoringDecoratorConfig 监控环境装饰器配置
 // 为长期监控 (api_monitor) 量身定制的配置
-func MonitoringDecoratorConfig() ProviderDecoratorConfig {
-	return ProviderDecoratorConfig{
-		Decorators: []DecoratorConfig{
+func MonitoringDecoratorConfig() provider.ProviderDecoratorConfig {
+	return provider.ProviderDecoratorConfig{
+		All: []provider.DecoratorConfig{
 			{
-				Type:     FrequencyControlType,
-				Enabled:  true,
-				Priority: 1,
-				Config: map[string]interface{}{
-					"min_interval_ms": 3000, // 3秒间隔，适合长期监控
-					"max_retries":     5,    // 更多重试次数
-					"enabled":         true,
-				},
-			},
-			{
-				Type:     CircuitBreakerType,
-				Enabled:  true,
-				Priority: 2,
+				Type:         provider.CircuitBreakerType,
+				Enabled:      true,
+				Priority:     2,
+				ProviderType: "all",
 				Config: map[string]interface{}{
 					"name":          "LongTermMonitoringProvider",
-					"max_requests":  10,     // 更宽松的熔断策略
-					"interval":      "300s", // 5分钟统计窗口
-					"timeout":       "120s", // 2分钟超时
-					"ready_to_trip": 10,     // 更高的阈值
+					"max_requests":  10,
+					"interval":      "300s",
+					"timeout":       "120s",
+					"ready_to_trip": 10,
 					"enabled":       true,
+				},
+			},
+		},
+		Realtime: []provider.DecoratorConfig{
+			{
+				Type:         provider.FrequencyControlType,
+				Enabled:      true,
+				Priority:     1,
+				ProviderType: "realtime",
+				Config: map[string]interface{}{
+					"min_interval_ms": 3000,
+					"max_retries":     5,
+					"enabled":         true,
 				},
 			},
 		},

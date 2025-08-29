@@ -40,7 +40,7 @@ func TestCachedProvider_FetchData_WithRealAPI_ShowsCacheHitAndMissBehavior(t *te
 
 	// 3. 第一次调用，应该会触发真实API调用，并将结果存入缓存
 	t.Log("第一次调用 (缓存未命中，将调用真实API)...")
-	data1, err := provider.FetchData(ctx, symbols)
+	data1, err := provider.FetchStockData(ctx, symbols)
 	require.NoError(t, err, "第一次API调用不应失败")
 	require.Len(t, data1, 1, "第一次调用应返回1条数据")
 	assert.Equal(t, "600519", data1[0].Symbol, "返回的股票代码应为无前缀格式")
@@ -48,7 +48,7 @@ func TestCachedProvider_FetchData_WithRealAPI_ShowsCacheHitAndMissBehavior(t *te
 
 	// 4. 第二次调用，应该直接从缓存获取数据
 	t.Log("第二次调用 (应从缓存命中)...")
-	data2, err := provider.FetchData(ctx, symbols)
+	data2, err := provider.FetchStockData(ctx, symbols)
 	require.NoError(t, err, "第二次缓存获取不应失败")
 	require.Len(t, data2, 1, "第二次调用应返回1条数据")
 	assert.Equal(t, "600519", data2[0].Symbol, "从缓存返回的股票代码应为无前缀格式")

@@ -77,49 +77,54 @@ func (g *TencentDataGenerator) generateSingleStockResponse(symbol string) string
 	pb := g.generatePB()
 	circulation := g.generateCirculation()
 
-	// 构建腾讯API格式的响应
-	response := fmt.Sprintf(
-		"v_%s%s=\"%s~%s~%s~%.2f~%.2f~%.2f~%d~%d~%d~%.2f~%.0f~%.2f~%.0f~%.2f~%.0f~%.2f~%.0f~%.2f~%.0f~%.2f~%.0f~%.2f~%.0f~%.2f~%.0f~%.2f~%.0f~%.2f~%.0f~%s~%.2f~%.2f~%.2f~%.2f~%.2f~%d~%.2f~%.2f~%d~%.2f~%d~%d~%d~%.2f~%d\";\n",
-		marketPrefix, symbol, // v_sh600000=
-		marketCode,             // 1
-		name,                   // 浦发银行
-		symbol,                 // 600000
-		price,                  // 当前价格
-		prevClose,              // 昨收
-		open,                   // 今开
-		volume,                 // 成交量
-		0,                      // 外盘
-		0,                      // 内盘
-		bidData[0], bidData[1], // 买一价格和数量
-		bidData[2], bidData[3], // 买二价格和数量
-		bidData[4], bidData[5], // 买三价格和数量
-		bidData[6], bidData[7], // 买四价格和数量
-		bidData[8], bidData[9], // 买五价格和数量
-		askData[0], askData[1], // 卖一价格和数量
-		askData[2], askData[3], // 卖二价格和数量
-		askData[4], askData[5], // 卖三价格和数量
-		askData[6], askData[7], // 卖四价格和数量
-		askData[8], askData[9], // 卖五价格和数量
-		timestamp,          // 时间戳
-		change,             // 涨跌额
-		changePercent,      // 涨跌幅
-		high,               // 最高
-		low,                // 最低
-		price,              // 最新价
-		int64(circulation), // 流通股本
-		turnoverRate,       // 换手率
-		pe,                 // 市盈率
-		0,                  // 未知字段
-		pb,                 // 市净率
-		int64(60000000),    // 总股本
-		0,                  // 未知字段
-		0,                  // 未知字段
-		0,                  // 未知字段
-		12.45,              // 净资产
-		0,                  // 未知字段
-	)
+	// 构建腾讯API格式的响应，使用strings.Builder避免格式化问题
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("v_%s%s=\"", marketPrefix, symbol))
 
-	return response
+	// 基础信息
+	builder.WriteString(fmt.Sprintf("%s~%s~%s~", marketCode, name, symbol))
+
+	// 价格数据
+	builder.WriteString(fmt.Sprintf("%.2f~%.2f~%.2f~", price, prevClose, open))
+
+	// 成交量和内外盘
+	builder.WriteString(fmt.Sprintf("%d~%d~%d~", volume, 0, 0))
+
+	// 五档买盘数据
+	for i := 0; i < 10; i++ {
+		if i > 0 {
+			builder.WriteString("~")
+		}
+		if i%2 == 0 {
+			builder.WriteString(fmt.Sprintf("%.2f", bidData[i]))
+		} else {
+			builder.WriteString(fmt.Sprintf("%.0f", bidData[i]))
+		}
+	}
+
+	// 五档卖盘数据
+	for i := 0; i < 10; i++ {
+		builder.WriteString("~")
+		if i%2 == 0 {
+			builder.WriteString(fmt.Sprintf("%.2f", askData[i]))
+		} else {
+			builder.WriteString(fmt.Sprintf("%.0f", askData[i]))
+		}
+	}
+
+	// 时间戳和其他数据
+	builder.WriteString(fmt.Sprintf("~%s~%.2f~%.2f~%.2f~%.2f~%.2f~", timestamp, change, changePercent, high, low, price))
+
+	// 流通股本、换手率、市盈率
+	builder.WriteString(fmt.Sprintf("%d~%.2f~%.2f~", int64(circulation), turnoverRate, pe))
+
+	// 其他字段
+	builder.WriteString(fmt.Sprintf("%d~%.2f~%d~%d~%d~%d~%.2f~%d",
+		0, pb, int64(60000000), 0, 0, 0, 12.45, 0))
+
+	builder.WriteString("\";\n")
+
+	return builder.String()
 }
 
 // getMarketCode 获取市场代码

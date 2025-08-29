@@ -107,6 +107,12 @@ func (mp *MockProvider) GetRateLimit() time.Duration {
 	return 200 * time.Millisecond // A sensible default
 }
 
+// IsHealthy 检查提供商的健康状态
+func (mp *MockProvider) IsHealthy() bool {
+	// Mock provider 总是健康的
+	return true
+}
+
 // IsSymbolSupported checks if a symbol is supported by the mock provider.
 func (mp *MockProvider) IsSymbolSupported(symbol string) bool {
 	// In mock provider, we can assume all symbols are supported.

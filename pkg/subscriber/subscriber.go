@@ -15,7 +15,7 @@ import (
 
 // DefaultSubscriber 默认订阅器实现
 type DefaultSubscriber struct {
-	provider      provider.Provider
+	provider      provider.RealtimeStockProvider
 	subscriptions map[string]*Subscription
 	subsMu        sync.RWMutex
 	eventChan     chan UpdateEvent
@@ -29,7 +29,7 @@ type DefaultSubscriber struct {
 }
 
 // NewSubscriber 创建新的订阅器
-func NewSubscriber(provider provider.Provider) *DefaultSubscriber {
+func NewSubscriber(provider provider.RealtimeStockProvider) *DefaultSubscriber {
 	return &DefaultSubscriber{
 		provider:      provider,
 		subscriptions: make(map[string]*Subscription),
@@ -178,7 +178,7 @@ func (s *DefaultSubscriber) GetSubscriptions() []Subscription {
 }
 
 // SetProvider 设置数据提供商
-func (s *DefaultSubscriber) SetProvider(provider provider.Provider) {
+func (s *DefaultSubscriber) SetProvider(provider provider.RealtimeStockProvider) {
 	s.provider = provider
 	s.log.Infof("Provider changed to: %s", provider.Name())
 }
@@ -330,7 +330,7 @@ func (s *DefaultSubscriber) fetchAndNotify(symbols []string) {
 	// 调用提供商的 FetchData 方法批量获取股票数据
 	// 这里是多态调用：s.provider 实现了 Provider 接口
 	// 具体可能是 TencentProvider、YahooProvider 等不同实现
-	data, err := s.provider.FetchData(ctx, symbols)
+	data, err := s.provider.FetchStockData(ctx, symbols)
 
 	// 计算 API 调用总耗时，用于性能分析和调试
 	elapsed := time.Since(start)

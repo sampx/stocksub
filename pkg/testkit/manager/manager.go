@@ -121,7 +121,7 @@ func (tdm *testDataManager) GetStockData(ctx context.Context, symbols []string) 
 	// 2. 缓存未命中，通过Provider获取
 	tdm.updateCacheMiss()
 	fmt.Printf("📡 通过Provider获取数据，股票: %v\n", symbols)
-	data, err := tdm.provider.FetchData(ctx, symbols)
+	data, err := tdm.provider.FetchStockData(ctx, symbols)
 	if err != nil {
 		return nil, fmt.Errorf("获取数据失败: %w", err)
 	}

@@ -14,8 +14,8 @@ import (
 // CircuitBreakerProvider 熔断器装饰器
 // 使用 sony/gobreaker 提供熔断功能
 type CircuitBreakerProvider struct {
-	*RealtimeStockBaseDecorator
-
+	provider.RealtimeStockProvider
+	*provider.BaseDecorator
 	// 熔断器组件
 	cb     *gobreaker.CircuitBreaker
 	config *CircuitBreakerConfig
@@ -77,37 +77,40 @@ func NewCircuitBreakerProvider(stockProvider provider.RealtimeStockProvider, con
 		},
 	}
 
-	provider := &CircuitBreakerProvider{
-		RealtimeStockBaseDecorator: NewRealtimeStockBaseDecorator(stockProvider),
-		cb:                         gobreaker.NewCircuitBreaker(settings),
-		config:                     config,
-		stats:                      CircuitBreakerStats{},
+	return &CircuitBreakerProvider{
+		RealtimeStockProvider: stockProvider,
+		BaseDecorator:         provider.NewBaseDecorator(stockProvider),
+		cb:                    gobreaker.NewCircuitBreaker(settings),
+		config:                config,
+		stats:                 CircuitBreakerStats{},
 	}
-
-	return provider
-}
-
-// Name 返回装饰器名称
-func (c *CircuitBreakerProvider) Name() string {
-	return fmt.Sprintf("CircuitBreaker(%s)", c.stockProvider.Name())
 }
 
 // IsHealthy 检查健康状态
 func (c *CircuitBreakerProvider) IsHealthy() bool {
 	if !c.config.Enabled {
-		return c.stockProvider.IsHealthy()
+		return c.RealtimeStockProvider.IsHealthy()
 	}
 
 	// 熔断器打开状态视为不健康
 	state := c.cb.State()
-	return state != gobreaker.StateOpen && c.stockProvider.IsHealthy()
+	return state != gobreaker.StateOpen && c.RealtimeStockProvider.IsHealthy()
+}
+
+// Name 返回装饰器名称
+func (c *CircuitBreakerProvider) Name() string {
+	return fmt.Sprintf("CircuitBreaker(%s)", c.RealtimeStockProvider.Name())
+}
+
+func (c *CircuitBreakerProvider) GetRateLimit() time.Duration {
+	return c.RealtimeStockProvider.GetRateLimit()
 }
 
 // FetchStockData 实现带熔断器的股票数据获取
 func (c *CircuitBreakerProvider) FetchStockData(ctx context.Context, symbols []string) ([]core.StockData, error) {
 	if !c.config.Enabled {
 		// 如果熔断器未启用，直接调用基础提供商
-		return c.stockProvider.FetchStockData(ctx, symbols)
+		return c.RealtimeStockProvider.FetchStockData(ctx, symbols)
 	}
 
 	// 更新统计信息
@@ -117,7 +120,7 @@ func (c *CircuitBreakerProvider) FetchStockData(ctx context.Context, symbols []s
 
 	// 通过熔断器执行请求
 	result, err := c.cb.Execute(func() (interface{}, error) {
-		return c.stockProvider.FetchStockData(ctx, symbols)
+		return c.RealtimeStockProvider.FetchStockData(ctx, symbols)
 	})
 
 	// 处理结果和错误统计
@@ -141,7 +144,7 @@ func (c *CircuitBreakerProvider) FetchStockData(ctx context.Context, symbols []s
 // FetchStockDataWithRaw 实现带熔断器的股票数据获取（包含原始数据）
 func (c *CircuitBreakerProvider) FetchStockDataWithRaw(ctx context.Context, symbols []string) ([]core.StockData, string, error) {
 	if !c.config.Enabled {
-		return c.stockProvider.FetchStockDataWithRaw(ctx, symbols)
+		return c.RealtimeStockProvider.FetchStockDataWithRaw(ctx, symbols)
 	}
 
 	c.mu.Lock()
@@ -156,7 +159,7 @@ func (c *CircuitBreakerProvider) FetchStockDataWithRaw(ctx context.Context, symb
 
 	// 通过熔断器执行请求
 	result, err := c.cb.Execute(func() (interface{}, error) {
-		data, raw, err := c.stockProvider.FetchStockDataWithRaw(ctx, symbols)
+		data, raw, err := c.RealtimeStockProvider.FetchStockDataWithRaw(ctx, symbols)
 		if err != nil {
 			return nil, err
 		}
@@ -213,7 +216,7 @@ func (c *CircuitBreakerProvider) GetStatus() map[string]interface{} {
 
 	return map[string]interface{}{
 		"decorator_type": "CircuitBreaker",
-		"base_provider":  c.stockProvider.Name(),
+		"base_provider":  c.RealtimeStockProvider.Name(),
 		"enabled":        c.config.Enabled,
 		"state":          state.String(),
 		"counts": map[string]interface{}{
@@ -269,4 +272,73 @@ func (c *CircuitBreakerProvider) IsHalfOpen() bool {
 // IsClosed 检查熔断器是否处于关闭状态
 func (c *CircuitBreakerProvider) IsClosed() bool {
 	return c.cb.State() == gobreaker.StateClosed
+}
+
+// --- Historical Provider Support ---
+
+// CircuitBreakerForHistoricalProvider 是为历史数据提供商设计的熔断器
+type CircuitBreakerForHistoricalProvider struct {
+	provider.HistoricalProvider
+	*provider.BaseDecorator
+	cb     *gobreaker.CircuitBreaker
+	config *CircuitBreakerConfig
+}
+
+// NewCircuitBreakerForHistoricalProvider 创建一个新的历史数据熔断器装饰器
+func NewCircuitBreakerForHistoricalProvider(p provider.HistoricalProvider, config *CircuitBreakerConfig) provider.Provider {
+	if config == nil {
+		config = DefaultCircuitBreakerConfig()
+		config.Name = "HistoricalProvider" // 为历史提供商使用不同的名称
+	}
+
+	settings := gobreaker.Settings{
+		Name:        config.Name,
+		MaxRequests: config.MaxRequests,
+		Interval:    config.Interval,
+		Timeout:     config.Timeout,
+		ReadyToTrip: func(counts gobreaker.Counts) bool {
+			return counts.ConsecutiveFailures >= config.ReadyToTrip
+		},
+	}
+
+	return &CircuitBreakerForHistoricalProvider{
+		HistoricalProvider: p,
+		BaseDecorator:      provider.NewBaseDecorator(p),
+		cb:                 gobreaker.NewCircuitBreaker(settings),
+		config:             config,
+	}
+}
+
+func (c *CircuitBreakerForHistoricalProvider) GetRateLimit() time.Duration {
+	return c.HistoricalProvider.GetRateLimit()
+}
+
+func (c *CircuitBreakerForHistoricalProvider) IsHealthy() bool {
+	return c.HistoricalProvider.IsHealthy()
+}
+
+func (c *CircuitBreakerForHistoricalProvider) Name() string {
+	return fmt.Sprintf("CircuitBreaker(%s)", c.HistoricalProvider.Name())
+}
+
+// FetchHistoricalData 实现带熔断的历史数据获取
+func (c *CircuitBreakerForHistoricalProvider) FetchHistoricalData(ctx context.Context, symbol string, start, end time.Time, period string) ([]core.HistoricalData, error) {
+	if !c.config.Enabled {
+		return c.HistoricalProvider.FetchHistoricalData(ctx, symbol, start, end, period)
+	}
+
+	result, err := c.cb.Execute(func() (interface{}, error) {
+		return c.HistoricalProvider.FetchHistoricalData(ctx, symbol, start, end, period)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	data, ok := result.([]core.HistoricalData)
+	if !ok {
+		return nil, fmt.Errorf("熔断器返回历史数据类型错误")
+	}
+
+	return data, nil
 }

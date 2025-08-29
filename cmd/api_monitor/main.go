@@ -328,7 +328,7 @@ func (m *APIMonitor) collectDataWithLimiter(ctx context.Context, successCount, e
 	queryTime := time.Now()
 
 	// 一次API调用获取所有股票数据
-	result, err := m.provider.FetchData(ctx, m.config.Symbols)
+	result, err := m.provider.FetchStockData(ctx, m.config.Symbols)
 
 	responseTime := time.Now()
 	requestDuration := responseTime.Sub(queryTime)

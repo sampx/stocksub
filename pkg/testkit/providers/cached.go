@@ -61,7 +61,7 @@ func NewCachedProvider(realProvider *TencentProviderWrapper, cache cache.Cache, 
 }
 
 // FetchData 获取股票数据
-func (cp *CachedProvider) FetchData(ctx context.Context, symbols []string) ([]core.StockData, error) {
+func (cp *CachedProvider) FetchStockData(ctx context.Context, symbols []string) ([]core.StockData, error) {
 	startTime := time.Now()
 	cp.stats.TotalRequests++
 	cp.stats.LastRequest = startTime
@@ -174,7 +174,7 @@ func (cp *CachedProvider) fetchFromRealProvider(ctx context.Context, symbols []s
 		// 创建超时上下文
 		timeoutCtx, cancel := context.WithTimeout(ctx, cp.config.TimeoutDuration)
 
-		data, err := cp.realProvider.FetchData(timeoutCtx, symbols)
+		data, err := cp.realProvider.FetchStockData(timeoutCtx, symbols)
 		cancel()
 
 		if err == nil {
@@ -222,7 +222,7 @@ type TencentProviderWrapper struct {
 }
 
 // FetchData 获取股票数据
-func (tpw *TencentProviderWrapper) FetchData(ctx context.Context, symbols []string) ([]core.StockData, error) {
+func (tpw *TencentProviderWrapper) FetchStockData(ctx context.Context, symbols []string) ([]core.StockData, error) {
 	tpw.mu.Lock()
 	defer tpw.mu.Unlock()
 
@@ -232,7 +232,7 @@ func (tpw *TencentProviderWrapper) FetchData(ctx context.Context, symbols []stri
 	}
 
 	// 调用腾讯API
-	return tpw.client.FetchData(ctx, symbols)
+	return tpw.client.FetchStockData(ctx, symbols)
 }
 
 // SetMockMode 设置Mock模式（腾讯Provider不支持）

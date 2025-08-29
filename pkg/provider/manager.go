@@ -27,9 +27,6 @@ type ProviderManager struct {
 	realtimeIndexProviders map[string]RealtimeIndexProvider
 	historicalProviders    map[string]HistoricalProvider
 
-	// 旧接口提供商（为了向后兼容）
-	legacyProviders map[string]Provider
-
 	mu sync.RWMutex
 }
 
@@ -39,7 +36,6 @@ func NewProviderManager() *ProviderManager {
 		realtimeStockProviders: make(map[string]RealtimeStockProvider),
 		realtimeIndexProviders: make(map[string]RealtimeIndexProvider),
 		historicalProviders:    make(map[string]HistoricalProvider),
-		legacyProviders:        make(map[string]Provider),
 	}
 }
 
@@ -88,22 +84,6 @@ func (m *ProviderManager) RegisterHistoricalProvider(name string, provider Histo
 	defer m.mu.Unlock()
 
 	m.historicalProviders[name] = provider
-	return nil
-}
-
-// RegisterLegacyProvider 注册旧版提供商（向后兼容）
-func (m *ProviderManager) RegisterLegacyProvider(name string, provider Provider) error {
-	if name == "" {
-		return fmt.Errorf("provider name cannot be empty")
-	}
-	if provider == nil {
-		return fmt.Errorf("provider cannot be nil")
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.legacyProviders[name] = provider
 	return nil
 }
 
@@ -170,18 +150,6 @@ func (m *ProviderManager) GetHistoricalProvider(name string) (HistoricalProvider
 	return nil, fmt.Errorf("historical provider '%s' not found", name)
 }
 
-// GetLegacyProvider 获取旧版提供商（向后兼容）
-func (m *ProviderManager) GetLegacyProvider(name string) (Provider, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if provider, exists := m.legacyProviders[name]; exists {
-		return provider, nil
-	}
-
-	return nil, fmt.Errorf("legacy provider '%s' not found", name)
-}
-
 // ListProviders 列出所有已注册的提供商
 func (m *ProviderManager) ListProviders() map[ProviderType][]string {
 	m.mu.RLock()
@@ -216,15 +184,6 @@ func (m *ProviderManager) ListProviders() map[ProviderType][]string {
 		result[TypeHistorical] = historicalNames
 	}
 
-	// 旧版提供商
-	var legacyNames []string
-	for name := range m.legacyProviders {
-		legacyNames = append(legacyNames, name)
-	}
-	if len(legacyNames) > 0 {
-		result[TypeLegacy] = legacyNames
-	}
-
 	return result
 }
 
@@ -252,11 +211,6 @@ func (m *ProviderManager) UnregisterProvider(name string) error {
 
 	if _, exists := m.historicalProviders[name]; exists {
 		delete(m.historicalProviders, name)
-		found = true
-	}
-
-	if _, exists := m.legacyProviders[name]; exists {
-		delete(m.legacyProviders, name)
 		found = true
 	}
 
@@ -303,7 +257,6 @@ func (m *ProviderManager) Close() error {
 	m.realtimeStockProviders = make(map[string]RealtimeStockProvider)
 	m.realtimeIndexProviders = make(map[string]RealtimeIndexProvider)
 	m.historicalProviders = make(map[string]HistoricalProvider)
-	m.legacyProviders = make(map[string]Provider)
 
 	if len(errors) > 0 {
 		return fmt.Errorf("errors occurred while closing providers: %v", errors)

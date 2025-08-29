@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"context"
+	"stocksub/pkg/provider"
 	"stocksub/pkg/provider/decorators"
 	"stocksub/pkg/provider/tencent"
 	"testing"
@@ -34,7 +35,7 @@ func TestAPIMonitorDecoratorCompatibility(t *testing.T) {
 		t.Logf("熔断器状态: %v", status["state"])
 
 		// 检查频率控制装饰器
-		if fcProvider, ok := cbProvider.GetBaseProvider().(*decorators.FrequencyControlProvider); ok {
+		if fcProvider, ok := cbProvider.RealtimeStockProvider.(*decorators.FrequencyControlProvider); ok {
 			fcStatus := fcProvider.GetStatus()
 			t.Logf("频率控制状态: 间隔=%v, 活跃=%v", fcStatus["min_interval"], fcStatus["is_active"])
 
@@ -80,7 +81,11 @@ func TestAPIMonitorDecoratorFunctionality(t *testing.T) {
 		t.Logf("执行第 %d 次调用", i+1)
 
 		start := time.Now()
-		data, err := decoratedProvider.FetchStockData(ctx, symbols)
+		realtimeProvider, ok := decoratedProvider.(provider.RealtimeStockProvider)
+		if !ok {
+			t.Fatalf("decoratedProvider is not a RealtimeStockProvider")
+		}
+		data, err := realtimeProvider.FetchStockData(ctx, symbols)
 		duration := time.Since(start)
 
 		if err != nil {
@@ -130,7 +135,11 @@ func TestAPIMonitorBackwardCompatibility(t *testing.T) {
 
 	// 测试 FetchStockData 方法
 	t.Log("测试 FetchStockData 方法...")
-	_, err = decoratedProvider.FetchStockData(ctx, symbols)
+	realtimeProvider, ok := decoratedProvider.(provider.RealtimeStockProvider)
+	if !ok {
+		t.Fatalf("decoratedProvider is not a RealtimeStockProvider")
+	}
+	_, err = realtimeProvider.FetchStockData(ctx, symbols)
 	if err != nil {
 		t.Logf("FetchStockData 调用结果: %v (这在测试环境中是正常的)", err)
 	} else {
@@ -139,7 +148,7 @@ func TestAPIMonitorBackwardCompatibility(t *testing.T) {
 
 	// 测试 FetchStockDataWithRaw 方法
 	t.Log("测试 FetchStockDataWithRaw 方法...")
-	_, _, err = decoratedProvider.FetchStockDataWithRaw(ctx, symbols)
+	_, _, err = realtimeProvider.FetchStockDataWithRaw(ctx, symbols)
 	if err != nil {
 		t.Logf("FetchStockDataWithRaw 调用结果: %v (这在测试环境中是正常的)", err)
 	} else {
@@ -148,7 +157,7 @@ func TestAPIMonitorBackwardCompatibility(t *testing.T) {
 
 	// 测试 IsSymbolSupported 方法
 	t.Log("测试 IsSymbolSupported 方法...")
-	supported := decoratedProvider.IsSymbolSupported("600000")
+	supported := realtimeProvider.IsSymbolSupported("600000")
 	if !supported {
 		t.Error("期望支持股票代码 600000")
 	} else {
@@ -184,7 +193,7 @@ func TestAPIMonitorConfigurationFlexibility(t *testing.T) {
 	// 测试不同的配置场景
 	testCases := []struct {
 		name   string
-		config decorators.ProviderDecoratorConfig
+		config provider.ProviderDecoratorConfig
 	}{
 		{
 			name:   "默认配置",

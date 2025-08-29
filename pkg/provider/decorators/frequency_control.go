@@ -14,8 +14,8 @@ import (
 // FrequencyControlProvider 频率控制装饰器
 // 将 pkg/limiter 的智能限流逻辑适配为装饰器模式
 type FrequencyControlProvider struct {
-	*RealtimeStockBaseDecorator
-
+	provider.RealtimeStockProvider
+	*provider.BaseDecorator
 	// 智能限流相关组件
 	limiter    *limiter.IntelligentLimiter
 	marketTime *timing.MarketTime
@@ -51,19 +51,20 @@ func NewFrequencyControlProvider(stockProvider provider.RealtimeStockProvider, c
 	marketTime := timing.DefaultMarketTime()
 
 	return &FrequencyControlProvider{
-		RealtimeStockBaseDecorator: NewRealtimeStockBaseDecorator(stockProvider),
-		limiter:                    limiter.NewIntelligentLimiter(marketTime),
-		marketTime:                 marketTime,
-		minInterval:                config.MinInterval,
-		maxRetries:                 config.MaxRetries,
-		isActive:                   config.Enabled,
-		lastRequest:                time.Time{},
+		RealtimeStockProvider: stockProvider,
+		BaseDecorator:         provider.NewBaseDecorator(stockProvider),
+		limiter:               limiter.NewIntelligentLimiter(marketTime),
+		marketTime:            marketTime,
+		minInterval:           config.MinInterval,
+		maxRetries:            config.MaxRetries,
+		isActive:              config.Enabled,
+		lastRequest:           time.Time{},
 	}
 }
 
 // Name 返回装饰器名称
 func (f *FrequencyControlProvider) Name() string {
-	return fmt.Sprintf("FrequencyControl(%s)", f.stockProvider.Name())
+	return fmt.Sprintf("FrequencyControl(%s)", f.RealtimeStockProvider.Name())
 }
 
 // GetRateLimit 返回频率限制
@@ -74,14 +75,14 @@ func (f *FrequencyControlProvider) GetRateLimit() time.Duration {
 // IsHealthy 检查健康状态
 func (f *FrequencyControlProvider) IsHealthy() bool {
 	// 检查基础提供商健康状态和限流器状态
-	return f.stockProvider.IsHealthy() && f.limiter.IsSafeToContinue()
+	return f.RealtimeStockProvider.IsHealthy() && f.limiter.IsSafeToContinue()
 }
 
 // FetchStockData 实现带频率控制的股票数据获取
 func (f *FrequencyControlProvider) FetchStockData(ctx context.Context, symbols []string) ([]core.StockData, error) {
 	if !f.isActive {
 		// 如果频率控制未激活，直接调用基础提供商
-		return f.stockProvider.FetchStockData(ctx, symbols)
+		return f.RealtimeStockProvider.FetchStockData(ctx, symbols)
 	}
 
 	// 初始化限流器批次信息
@@ -94,7 +95,7 @@ func (f *FrequencyControlProvider) FetchStockData(ctx context.Context, symbols [
 // FetchStockDataWithRaw 实现带频率控制的股票数据获取（包含原始数据）
 func (f *FrequencyControlProvider) FetchStockDataWithRaw(ctx context.Context, symbols []string) ([]core.StockData, string, error) {
 	if !f.isActive {
-		return f.stockProvider.FetchStockDataWithRaw(ctx, symbols)
+		return f.RealtimeStockProvider.FetchStockDataWithRaw(ctx, symbols)
 	}
 
 	f.limiter.InitializeBatch(symbols)
@@ -116,7 +117,7 @@ func (f *FrequencyControlProvider) fetchWithIntelligentRetry(ctx context.Context
 		}
 
 		// 调用基础提供商获取数据
-		data, err := f.stockProvider.FetchStockData(ctx, symbols)
+		data, err := f.RealtimeStockProvider.FetchStockData(ctx, symbols)
 
 		// 将结果转换为字符串数组供限流器分析
 		var dataStrings []string
@@ -170,7 +171,7 @@ func (f *FrequencyControlProvider) fetchWithRawAndRetry(ctx context.Context, sym
 			return nil, "", err
 		}
 
-		data, raw, err := f.stockProvider.FetchStockDataWithRaw(ctx, symbols)
+		data, raw, err := f.RealtimeStockProvider.FetchStockDataWithRaw(ctx, symbols)
 
 		var dataStrings []string
 		if err == nil && len(data) > 0 {
@@ -263,7 +264,7 @@ func (f *FrequencyControlProvider) GetStatus() map[string]interface{} {
 	status["max_retries"] = f.maxRetries
 	status["is_active"] = f.isActive
 	status["last_request"] = f.lastRequest
-	status["base_provider"] = f.stockProvider.Name()
+	status["base_provider"] = f.RealtimeStockProvider.Name()
 
 	return status
 }
@@ -275,4 +276,89 @@ func (f *FrequencyControlProvider) Reset() {
 
 	f.lastRequest = time.Time{}
 	f.limiter.Reset()
+}
+
+// FrequencyControlForHistoricalProvider 是为历史数据提供商设计的频率控制装饰器
+type FrequencyControlForHistoricalProvider struct {
+	provider.HistoricalProvider
+	*provider.BaseDecorator
+	minInterval time.Duration
+	maxRetries  int
+	isActive    bool
+	mu          sync.RWMutex
+	lastRequest time.Time
+}
+
+// NewFrequencyControlForHistoricalProvider 创建一个新的历史数据频率控制装饰器
+func NewFrequencyControlForHistoricalProvider(p provider.HistoricalProvider, config *FrequencyControlConfig) provider.Provider {
+	if config == nil {
+		config = &FrequencyControlConfig{
+			MinInterval: 1 * time.Second, // 历史数据默认间隔更长
+			MaxRetries:  3,
+			Enabled:     true,
+		}
+	}
+	return &FrequencyControlForHistoricalProvider{
+		HistoricalProvider: p,
+		BaseDecorator:      provider.NewBaseDecorator(p),
+		minInterval:        config.MinInterval,
+		maxRetries:         config.MaxRetries,
+		isActive:           config.Enabled,
+	}
+}
+
+// FetchHistoricalData 实现带频率控制的历史数据获取
+func (f *FrequencyControlForHistoricalProvider) FetchHistoricalData(ctx context.Context, symbol string, start, end time.Time, period string) ([]core.HistoricalData, error) {
+	if !f.isActive {
+		return f.HistoricalProvider.FetchHistoricalData(ctx, symbol, start, end, period)
+	}
+
+	for attempt := 0; attempt <= f.maxRetries; attempt++ {
+		if err := f.enforceFrequencyLimit(ctx); err != nil {
+			return nil, err
+		}
+
+		data, err := f.HistoricalProvider.FetchHistoricalData(ctx, symbol, start, end, period)
+		if err == nil {
+			return data, nil
+		}
+
+		// 简单的重试逻辑，可以根据需要扩展
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(500 * time.Millisecond): // 重试前等待
+			continue
+		}
+	}
+	return nil, fmt.Errorf("获取历史数据失败，已达到最大重试次数 (%d)", f.maxRetries)
+}
+
+func (f *FrequencyControlForHistoricalProvider) enforceFrequencyLimit(ctx context.Context) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	elapsed := time.Since(f.lastRequest)
+	if elapsed < f.minInterval {
+		waitTime := f.minInterval - elapsed
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(waitTime):
+		}
+	}
+	f.lastRequest = time.Now()
+	return nil
+}
+
+func (f *FrequencyControlForHistoricalProvider) GetRateLimit() time.Duration {
+	return f.minInterval
+}
+
+func (f *FrequencyControlForHistoricalProvider) IsHealthy() bool {
+	return f.HistoricalProvider.IsHealthy()
+}
+
+func (f *FrequencyControlForHistoricalProvider) Name() string {
+	return fmt.Sprintf("FrequencyControl(%s)", f.HistoricalProvider.Name())
 }
