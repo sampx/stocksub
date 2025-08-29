@@ -16,3 +16,4 @@ tests/data/
 .kilocode/
 CLAUDE.md
 QWEN.md
+.continue/rules/
