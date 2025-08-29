@@ -10,7 +10,9 @@ tests/data/
 # ai
 .claude/
 .continue/
-.Qoder/
+.qoder/
 .kiro/
+.spec-workflow/
+.kilocode/
 CLAUDE.md
 QWEN.md

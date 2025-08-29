@@ -52,9 +52,15 @@ issues:
         - errcheck
         - unused
 
+    # 规则2: 忽略 pkg/provider/tencent/parser.go 文件中的 unused 错误
+    # 因为这些函数在同一个包的其他文件中被使用，但 golangci-lint 在分析单个文件时无法正确处理包内引用
+    - path: pkg/provider/tencent/parser\.go
+      linters:
+        - unused
+
     # 你可以根据需要添加更多规则，例如：
     #
-    # 规则2: 忽略 fmt.Print* 系列函数的错误检查 (这些函数很少返回需要处理的错误)
+    # 规则3: 忽略 fmt.Print* 系列函数的错误检查 (这些函数很少返回需要处理的错误)
     # - text: "Error return value of `fmt.Print"
     #   linters:
     #     - errcheck
