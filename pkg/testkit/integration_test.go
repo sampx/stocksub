@@ -5,15 +5,16 @@ package testkit_test
 import (
 	"context"
 	"os"
-	"stocksub/pkg/subscriber"
-	"stocksub/pkg/testkit"
-	"stocksub/pkg/testkit/config"
-	"stocksub/pkg/testkit/core"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"stocksub/pkg/core"
+	"stocksub/pkg/testkit"
+	"stocksub/pkg/testkit/config"
+	"stocksub/pkg/testkit/manager"
 )
 
 func TestTestDataManager_GetStockData_WithMockData_ReturnsExpectedResults(t *testing.T) {
@@ -32,7 +33,7 @@ func TestTestDataManager_GetStockData_WithMockData_ReturnsExpectedResults(t *tes
 		},
 	}
 
-	manager := testkit.NewTestDataManager(cfg)
+	manager := manager.NewTestDataManager(cfg)
 	defer manager.Close()
 
 	ctx := context.Background()
@@ -40,7 +41,7 @@ func TestTestDataManager_GetStockData_WithMockData_ReturnsExpectedResults(t *tes
 
 	manager.EnableMock(true)
 
-	mockData := []subscriber.StockData{
+	mockData := []core.StockData{
 		{
 			Symbol:        "INTG001",
 			Name:          "集成测试股票1",
@@ -89,7 +90,7 @@ func TestTestDataManager_GetStockData_WithLayeredCache_ShowsCacheHits(t *testing
 		},
 	}
 
-	manager := testkit.NewTestDataManager(cfg)
+	manager := manager.NewTestDataManager(cfg)
 	defer manager.Close()
 
 	ctx := context.Background()
@@ -97,7 +98,7 @@ func TestTestDataManager_GetStockData_WithLayeredCache_ShowsCacheHits(t *testing
 
 	manager.EnableMock(true)
 
-	mockData := []subscriber.StockData{
+	mockData := []core.StockData{
 		{
 			Symbol: "CACHE001",
 			Name:   "缓存测试股票",
@@ -133,7 +134,7 @@ func TestTestDataManager_GetStockData_WithCSVStorage_CreatesFiles(t *testing.T) 
 		},
 	}
 
-	manager := testkit.NewTestDataManager(cfg)
+	manager := manager.NewTestDataManager(cfg)
 	defer manager.Close()
 
 	ctx := context.Background()
@@ -141,7 +142,7 @@ func TestTestDataManager_GetStockData_WithCSVStorage_CreatesFiles(t *testing.T) 
 
 	manager.EnableMock(true)
 
-	mockData := []subscriber.StockData{
+	mockData := []core.StockData{
 		{
 			Symbol: "STORE001",
 			Name:   "存储测试股票1",
@@ -170,7 +171,7 @@ func TestTestDataManager_GetStockData_WithCSVStorage_CreatesFiles(t *testing.T) 
 // --- Migrated from pkg/testkit/storage/integration_test.go ---
 
 // setupTestManager 创建一个新的测试管理器
-func setupTestManager(t *testing.T) core.TestDataManager {
+func setupTestManager(t *testing.T) testkit.TestDataManager {
 	cfg := &config.Config{
 		Cache: config.CacheConfig{
 			Type: "memory",
@@ -180,7 +181,7 @@ func setupTestManager(t *testing.T) core.TestDataManager {
 			Directory: t.TempDir(),
 		},
 	}
-	manager := testkit.NewTestDataManager(cfg)
+	manager := manager.NewTestDataManager(cfg)
 	// 启用 mock 模式，确保测试的确定性
 	manager.EnableMock(true)
 	return manager
@@ -192,7 +193,7 @@ func TestTestDataManager_GetStockData_WithCacheDisabled_ForcesProviderRefresh(t 
 	defer manager.Close()
 
 	symbols := []string{"600000"}
-	mockData := []subscriber.StockData{{Symbol: "600000", Price: 123.45}}
+	mockData := []core.StockData{{Symbol: "600000", Price: 123.45}}
 	manager.SetMockData(symbols, mockData)
 
 	// 首次调用，填充缓存

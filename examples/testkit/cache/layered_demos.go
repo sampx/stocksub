@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"stocksub/pkg/testkit/cache"
+	"stocksub/pkg/cache"
 )
 
 // basicLayeredCacheDemo 基础分层缓存演示

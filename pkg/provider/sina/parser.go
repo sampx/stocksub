@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"stocksub/pkg/subscriber"
+	"stocksub/pkg/core"
 
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
@@ -26,9 +26,9 @@ func gbkToUtf8(gbkStr string) string {
 }
 
 // parseSinaData 解析新浪返回的数据
-func parseSinaData(data string) []subscriber.StockData {
+func parseSinaData(data string) []core.StockData {
 	lines := strings.Split(data, ";")
-	results := make([]subscriber.StockData, 0, len(lines))
+	results := make([]core.StockData, 0, len(lines))
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -62,7 +62,7 @@ func parseSinaData(data string) []subscriber.StockData {
 			changePercent = (change / prevClose) * 100
 		}
 
-		stockData := subscriber.StockData{
+		stockData := core.StockData{
 			Symbol:        symbol,
 			Name:          gbkToUtf8(fields[0]),
 			Price:         price,

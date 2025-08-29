@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"stocksub/pkg/testkit/cache"
+	"stocksub/pkg/cache"
 )
 
 func diskCacheDemo() {

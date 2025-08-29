@@ -2,8 +2,6 @@ package provider
 
 import (
 	"fmt"
-	"stocksub/pkg/provider/core"
-	"stocksub/pkg/subscriber"
 	"sync"
 )
 
@@ -25,12 +23,12 @@ const (
 // 支持新旧接口的并存，提供统一的访问接口
 type ProviderManager struct {
 	// 新接口提供商
-	realtimeStockProviders map[string]core.RealtimeStockProvider
-	realtimeIndexProviders map[string]core.RealtimeIndexProvider
-	historicalProviders    map[string]core.HistoricalProvider
+	realtimeStockProviders map[string]RealtimeStockProvider
+	realtimeIndexProviders map[string]RealtimeIndexProvider
+	historicalProviders    map[string]HistoricalProvider
 
 	// 旧接口提供商（为了向后兼容）
-	legacyProviders map[string]subscriber.Provider
+	legacyProviders map[string]Provider
 
 	mu sync.RWMutex
 }
@@ -38,15 +36,15 @@ type ProviderManager struct {
 // NewProviderManager 创建新的提供商管理器
 func NewProviderManager() *ProviderManager {
 	return &ProviderManager{
-		realtimeStockProviders: make(map[string]core.RealtimeStockProvider),
-		realtimeIndexProviders: make(map[string]core.RealtimeIndexProvider),
-		historicalProviders:    make(map[string]core.HistoricalProvider),
-		legacyProviders:        make(map[string]subscriber.Provider),
+		realtimeStockProviders: make(map[string]RealtimeStockProvider),
+		realtimeIndexProviders: make(map[string]RealtimeIndexProvider),
+		historicalProviders:    make(map[string]HistoricalProvider),
+		legacyProviders:        make(map[string]Provider),
 	}
 }
 
 // RegisterRealtimeStockProvider 注册实时股票数据提供商
-func (m *ProviderManager) RegisterRealtimeStockProvider(name string, provider core.RealtimeStockProvider) error {
+func (m *ProviderManager) RegisterRealtimeStockProvider(name string, provider RealtimeStockProvider) error {
 	if name == "" {
 		return fmt.Errorf("provider name cannot be empty")
 	}
@@ -62,7 +60,7 @@ func (m *ProviderManager) RegisterRealtimeStockProvider(name string, provider co
 }
 
 // RegisterRealtimeIndexProvider 注册实时指数数据提供商
-func (m *ProviderManager) RegisterRealtimeIndexProvider(name string, provider core.RealtimeIndexProvider) error {
+func (m *ProviderManager) RegisterRealtimeIndexProvider(name string, provider RealtimeIndexProvider) error {
 	if name == "" {
 		return fmt.Errorf("provider name cannot be empty")
 	}
@@ -78,7 +76,7 @@ func (m *ProviderManager) RegisterRealtimeIndexProvider(name string, provider co
 }
 
 // RegisterHistoricalProvider 注册历史数据提供商
-func (m *ProviderManager) RegisterHistoricalProvider(name string, provider core.HistoricalProvider) error {
+func (m *ProviderManager) RegisterHistoricalProvider(name string, provider HistoricalProvider) error {
 	if name == "" {
 		return fmt.Errorf("provider name cannot be empty")
 	}
@@ -94,7 +92,7 @@ func (m *ProviderManager) RegisterHistoricalProvider(name string, provider core.
 }
 
 // RegisterLegacyProvider 注册旧版提供商（向后兼容）
-func (m *ProviderManager) RegisterLegacyProvider(name string, provider subscriber.Provider) error {
+func (m *ProviderManager) RegisterLegacyProvider(name string, provider Provider) error {
 	if name == "" {
 		return fmt.Errorf("provider name cannot be empty")
 	}
@@ -120,34 +118,23 @@ func (m *ProviderManager) RegisterProvider(name string, provider interface{}) er
 	}
 
 	// 尝试注册为新接口类型
-	if stockProvider, ok := provider.(core.RealtimeStockProvider); ok {
+	if stockProvider, ok := provider.(RealtimeStockProvider); ok {
 		return m.RegisterRealtimeStockProvider(name, stockProvider)
 	}
 
-	if indexProvider, ok := provider.(core.RealtimeIndexProvider); ok {
+	if indexProvider, ok := provider.(RealtimeIndexProvider); ok {
 		return m.RegisterRealtimeIndexProvider(name, indexProvider)
 	}
 
-	if historicalProvider, ok := provider.(core.HistoricalProvider); ok {
+	if historicalProvider, ok := provider.(HistoricalProvider); ok {
 		return m.RegisterHistoricalProvider(name, historicalProvider)
-	}
-
-	// 兼容旧版接口
-	if legacyProvider, ok := provider.(subscriber.Provider); ok {
-		return m.RegisterLegacyProvider(name, legacyProvider)
-	}
-
-	// 使用智能适配器处理其他类型（包括 testkit Provider）
-	smartAdapter := core.NewSmartProviderAdapter(provider)
-	if smartAdapter.IsSupported() {
-		return m.RegisterRealtimeStockProvider(name, smartAdapter)
 	}
 
 	return fmt.Errorf("unsupported provider type: %T", provider)
 }
 
 // GetRealtimeStockProvider 获取实时股票数据提供商
-func (m *ProviderManager) GetRealtimeStockProvider(name string) (core.RealtimeStockProvider, error) {
+func (m *ProviderManager) GetRealtimeStockProvider(name string) (RealtimeStockProvider, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -156,16 +143,11 @@ func (m *ProviderManager) GetRealtimeStockProvider(name string) (core.RealtimeSt
 		return provider, nil
 	}
 
-	// 检查旧接口提供商，如果存在则使用适配器
-	if legacyProvider, exists := m.legacyProviders[name]; exists {
-		return core.NewLegacyProviderAdapter(legacyProvider), nil
-	}
-
 	return nil, fmt.Errorf("realtime stock provider '%s' not found", name)
 }
 
 // GetRealtimeIndexProvider 获取实时指数数据提供商
-func (m *ProviderManager) GetRealtimeIndexProvider(name string) (core.RealtimeIndexProvider, error) {
+func (m *ProviderManager) GetRealtimeIndexProvider(name string) (RealtimeIndexProvider, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -177,7 +159,7 @@ func (m *ProviderManager) GetRealtimeIndexProvider(name string) (core.RealtimeIn
 }
 
 // GetHistoricalProvider 获取历史数据提供商
-func (m *ProviderManager) GetHistoricalProvider(name string) (core.HistoricalProvider, error) {
+func (m *ProviderManager) GetHistoricalProvider(name string) (HistoricalProvider, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -189,7 +171,7 @@ func (m *ProviderManager) GetHistoricalProvider(name string) (core.HistoricalPro
 }
 
 // GetLegacyProvider 获取旧版提供商（向后兼容）
-func (m *ProviderManager) GetLegacyProvider(name string) (subscriber.Provider, error) {
+func (m *ProviderManager) GetLegacyProvider(name string) (Provider, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -294,7 +276,7 @@ func (m *ProviderManager) Close() error {
 
 	// 关闭所有支持关闭的提供商
 	for name, provider := range m.realtimeStockProviders {
-		if closable, ok := provider.(core.Closable); ok {
+		if closable, ok := provider.(Closable); ok {
 			if err := closable.Close(); err != nil {
 				errors = append(errors, fmt.Errorf("error closing realtime stock provider '%s': %w", name, err))
 			}
@@ -302,7 +284,7 @@ func (m *ProviderManager) Close() error {
 	}
 
 	for name, provider := range m.realtimeIndexProviders {
-		if closable, ok := provider.(core.Closable); ok {
+		if closable, ok := provider.(Closable); ok {
 			if err := closable.Close(); err != nil {
 				errors = append(errors, fmt.Errorf("error closing realtime index provider '%s': %w", name, err))
 			}
@@ -310,7 +292,7 @@ func (m *ProviderManager) Close() error {
 	}
 
 	for name, provider := range m.historicalProviders {
-		if closable, ok := provider.(core.Closable); ok {
+		if closable, ok := provider.(Closable); ok {
 			if err := closable.Close(); err != nil {
 				errors = append(errors, fmt.Errorf("error closing historical provider '%s': %w", name, err))
 			}
@@ -318,10 +300,10 @@ func (m *ProviderManager) Close() error {
 	}
 
 	// 清空所有映射
-	m.realtimeStockProviders = make(map[string]core.RealtimeStockProvider)
-	m.realtimeIndexProviders = make(map[string]core.RealtimeIndexProvider)
-	m.historicalProviders = make(map[string]core.HistoricalProvider)
-	m.legacyProviders = make(map[string]subscriber.Provider)
+	m.realtimeStockProviders = make(map[string]RealtimeStockProvider)
+	m.realtimeIndexProviders = make(map[string]RealtimeIndexProvider)
+	m.historicalProviders = make(map[string]HistoricalProvider)
+	m.legacyProviders = make(map[string]Provider)
 
 	if len(errors) > 0 {
 		return fmt.Errorf("errors occurred while closing providers: %v", errors)

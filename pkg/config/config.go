@@ -44,6 +44,7 @@ type LoggerConfig struct {
 	MaxSize    int    `json:"max_size"`    // 最大文件大小(MB)
 	MaxBackups int    `json:"max_backups"` // 最大备份数
 	MaxAge     int    `json:"max_age"`     // 最大保存天数
+	Format     string `json:"format"`      // 日志格式 (text, json)
 }
 
 // Default 返回默认配置
@@ -65,9 +66,10 @@ func Default() *Config {
 			EventChannelBuffer: 1000,
 		},
 		Logger: LoggerConfig{
-			Level:      "info",
+			Level:      "debug",
 			Output:     "console",
 			Filename:   "stocksub.log",
+			Format:     "text",
 			MaxSize:    10,
 			MaxBackups: 5,
 			MaxAge:     30,

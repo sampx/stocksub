@@ -3,13 +3,13 @@ package integration_test
 import (
 	"context"
 	"testing"
-	"time"
 
+	"stocksub/pkg/core"
 	"stocksub/pkg/limiter"
 	"stocksub/pkg/provider/tencent"
 	"stocksub/pkg/subscriber"
-	"stocksub/pkg/testkit"
 	"stocksub/pkg/testkit/config"
+	"stocksub/pkg/testkit/manager"
 	"stocksub/pkg/timing"
 )
 
@@ -18,9 +18,9 @@ func TestAPIMonitorCompatibility(t *testing.T) {
 	ctx := context.Background()
 
 	// 创建模拟的 api_monitor 配置
-	provider := tencent.NewProvider()
-	provider.SetTimeout(30 * time.Second)
-	provider.SetRateLimit(1 * time.Second)
+	provider := tencent.NewClient()
+	// provider.SetTimeout(30 * time.Second)
+	// provider.SetRateLimit(1 * time.Second)
 
 	marketTime := timing.DefaultMarketTime()
 	_ = limiter.NewIntelligentLimiter(marketTime) // 仅用于初始化测试
@@ -29,7 +29,7 @@ func TestAPIMonitorCompatibility(t *testing.T) {
 	symbols := []string{"600000", "000001"}
 
 	// 测试数据获取
-	result, _, err := provider.FetchDataWithRaw(ctx, symbols)
+	result, _, err := provider.FetchStockDataWithRaw(ctx, symbols)
 	if err != nil {
 		t.Skipf("API 调用失败，跳过测试: %v", err)
 	}
@@ -61,13 +61,13 @@ func TestTestKitCompatibility(t *testing.T) {
 		Storage: config.StorageConfig{Type: "memory"},
 	}
 
-	manager := testkit.NewTestDataManager(cfg)
+	manager := manager.NewTestDataManager(cfg)
 	defer manager.Close()
 
 	// 启用 Mock 模式进行测试
 	manager.EnableMock(true)
 	symbols := []string{"600000", "000001"}
-	mockData := []subscriber.StockData{
+	mockData := []core.StockData{
 		{Symbol: "600000", Price: 10.50, Volume: 1000000},
 		{Symbol: "000001", Price: 15.20, Volume: 2000000},
 	}
@@ -139,7 +139,7 @@ func TestSubscriberCompatibility(t *testing.T) {
 	// 跳过详细的版本检查，主要验证类型兼容性
 
 	// 测试类型存在性
-	var _ subscriber.StockData
+	var _ core.StockData
 	var _ subscriber.EventType
 
 	t.Log("订阅者基础结构验证通过")

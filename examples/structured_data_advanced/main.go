@@ -6,9 +6,8 @@ import (
 	"log"
 	"time"
 
-	"stocksub/pkg/subscriber"
-	"stocksub/pkg/testkit/core"
-	"stocksub/pkg/testkit/storage"
+	"stocksub/pkg/core"
+	"stocksub/pkg/storage"
 )
 
 func main() {
@@ -35,13 +34,13 @@ func complexSchemaExample() {
 	fmt.Println("\n--- 高级示例1：复杂数据模式设计 ---")
 
 	// 设计一个复杂的期权数据模式
-	optionSchema := &subscriber.DataSchema{
+	optionSchema := &storage.DataSchema{
 		Name:        "option_data",
 		Description: "期权数据模式",
-		Fields: map[string]*subscriber.FieldDefinition{
+		Fields: map[string]*storage.FieldDefinition{
 			"option_code": {
 				Name:        "option_code",
-				Type:        subscriber.FieldTypeString,
+				Type:        storage.FieldTypeString,
 				Description: "期权合约代码",
 				Required:    true,
 				Validator: func(value interface{}) error {
@@ -53,13 +52,13 @@ func complexSchemaExample() {
 			},
 			"underlying_asset": {
 				Name:        "underlying_asset",
-				Type:        subscriber.FieldTypeString,
+				Type:        storage.FieldTypeString,
 				Description: "标的资产",
 				Required:    true,
 			},
 			"option_type": {
 				Name:        "option_type",
-				Type:        subscriber.FieldTypeString,
+				Type:        storage.FieldTypeString,
 				Description: "期权类型",
 				Required:    true,
 				Validator: func(value interface{}) error {
@@ -73,63 +72,63 @@ func complexSchemaExample() {
 			},
 			"strike_price": {
 				Name:        "strike_price",
-				Type:        subscriber.FieldTypeFloat64,
+				Type:        storage.FieldTypeFloat64,
 				Description: "行权价格",
 				Required:    true,
 			},
 			"expiry_date": {
 				Name:        "expiry_date",
-				Type:        subscriber.FieldTypeTime,
+				Type:        storage.FieldTypeTime,
 				Description: "到期日",
 				Required:    true,
 			},
 			"current_price": {
 				Name:        "current_price",
-				Type:        subscriber.FieldTypeFloat64,
+				Type:        storage.FieldTypeFloat64,
 				Description: "当前价格",
 				Required:    true,
 			},
 			"implied_volatility": {
 				Name:         "implied_volatility",
-				Type:         subscriber.FieldTypeFloat64,
+				Type:         storage.FieldTypeFloat64,
 				Description:  "隐含波动率",
 				Required:     false,
 				DefaultValue: 0.0,
 			},
 			"delta": {
 				Name:        "delta",
-				Type:        subscriber.FieldTypeFloat64,
+				Type:        storage.FieldTypeFloat64,
 				Description: "Delta值",
 				Required:    false,
 			},
 			"gamma": {
 				Name:        "gamma",
-				Type:        subscriber.FieldTypeFloat64,
+				Type:        storage.FieldTypeFloat64,
 				Description: "Gamma值",
 				Required:    false,
 			},
 			"theta": {
 				Name:        "theta",
-				Type:        subscriber.FieldTypeFloat64,
+				Type:        storage.FieldTypeFloat64,
 				Description: "Theta值",
 				Required:    false,
 			},
 			"vega": {
 				Name:        "vega",
-				Type:        subscriber.FieldTypeFloat64,
+				Type:        storage.FieldTypeFloat64,
 				Description: "Vega值",
 				Required:    false,
 			},
 			"open_interest": {
 				Name:         "open_interest",
-				Type:         subscriber.FieldTypeInt,
+				Type:         storage.FieldTypeInt,
 				Description:  "持仓量",
 				Required:     false,
 				DefaultValue: int64(0),
 			},
 			"trading_volume": {
 				Name:         "trading_volume",
-				Type:         subscriber.FieldTypeInt,
+				Type:         storage.FieldTypeInt,
 				Description:  "成交量",
 				Required:     false,
 				DefaultValue: int64(0),
@@ -143,12 +142,12 @@ func complexSchemaExample() {
 	}
 
 	// 验证复杂模式
-	if err := subscriber.ValidateSchema(optionSchema); err != nil {
+	if err := storage.ValidateSchema(optionSchema); err != nil {
 		log.Fatalf("复杂模式验证失败: %v", err)
 	}
 
 	// 创建期权数据实例
-	optionData := subscriber.NewStructuredData(optionSchema)
+	optionData := storage.NewStructuredData(optionSchema)
 
 	// 设置期权数据
 	expiryDate := time.Now().AddDate(0, 3, 0) // 3个月后到期
@@ -212,7 +211,7 @@ func dataPipelineExample() {
 	fmt.Println("启动模拟数据流水线...")
 
 	// 数据生成器
-	dataChannel := make(chan *subscriber.StructuredData, 100)
+	dataChannel := make(chan *storage.StructuredData, 100)
 	errorChannel := make(chan error, 10)
 
 	// 启动数据生成goroutine
@@ -220,7 +219,7 @@ func dataPipelineExample() {
 		defer close(dataChannel)
 
 		for i := 0; i < 100; i++ {
-			stockData := subscriber.NewStructuredData(subscriber.StockDataSchema)
+			stockData := storage.NewStructuredData(storage.StockDataSchema)
 
 			symbol := fmt.Sprintf("60%04d", i%50) // 模拟50只股票
 			name := fmt.Sprintf("股票%d", i%50)
@@ -341,9 +340,9 @@ func performanceMonitoringExample() {
 		ms := storage.NewMemoryStorage(cfg.config)
 
 		// 准备测试数据
-		testData := make([]*subscriber.StructuredData, 500)
+		testData := make([]*storage.StructuredData, 500)
 		for i := 0; i < 500; i++ {
-			stockData := subscriber.NewStructuredData(subscriber.StockDataSchema)
+			stockData := storage.NewStructuredData(storage.StockDataSchema)
 			stockData.SetFieldSafe("symbol", fmt.Sprintf("60%04d", i%100))
 			stockData.SetFieldSafe("name", fmt.Sprintf("股票%d", i%100))
 			stockData.SetFieldSafe("price", 10.0+float64(i%50)*0.5)
@@ -413,8 +412,8 @@ func multiSchemaManagementExample() {
 	ctx := context.Background()
 
 	// 定义多个数据模式
-	schemas := map[string]*subscriber.DataSchema{
-		"stock": subscriber.StockDataSchema,
+	schemas := map[string]*storage.DataSchema{
+		"stock": storage.StockDataSchema,
 		"trade": createTradeSchema(),
 		"order": createOrderSchema(),
 		"news":  createNewsSchema(),
@@ -425,7 +424,7 @@ func multiSchemaManagementExample() {
 
 	// 股票数据
 	for i := 0; i < 10; i++ {
-		stockData := subscriber.NewStructuredData(schemas["stock"])
+		stockData := storage.NewStructuredData(schemas["stock"])
 		stockData.SetFieldSafe("symbol", fmt.Sprintf("60000%d", i))
 		stockData.SetFieldSafe("name", fmt.Sprintf("股票%d", i))
 		stockData.SetFieldSafe("price", 10.0+float64(i))
@@ -435,7 +434,7 @@ func multiSchemaManagementExample() {
 
 	// 交易数据
 	for i := 0; i < 5; i++ {
-		tradeData := subscriber.NewStructuredData(schemas["trade"])
+		tradeData := storage.NewStructuredData(schemas["trade"])
 		tradeData.SetFieldSafe("trade_id", fmt.Sprintf("T%05d", i))
 		tradeData.SetFieldSafe("symbol", fmt.Sprintf("60000%d", i%3))
 		tradeData.SetFieldSafe("side", []string{"BUY", "SELL"}[i%2])
@@ -447,7 +446,7 @@ func multiSchemaManagementExample() {
 
 	// 订单数据
 	for i := 0; i < 8; i++ {
-		orderData := subscriber.NewStructuredData(schemas["order"])
+		orderData := storage.NewStructuredData(schemas["order"])
 		orderData.SetFieldSafe("order_id", fmt.Sprintf("O%05d", i))
 		orderData.SetFieldSafe("symbol", fmt.Sprintf("60000%d", i%4))
 		orderData.SetFieldSafe("side", []string{"BUY", "SELL"}[i%2])
@@ -460,7 +459,7 @@ func multiSchemaManagementExample() {
 
 	// 新闻数据
 	for i := 0; i < 3; i++ {
-		newsData := subscriber.NewStructuredData(schemas["news"])
+		newsData := storage.NewStructuredData(schemas["news"])
 		newsData.SetFieldSafe("news_id", fmt.Sprintf("N%05d", i))
 		newsData.SetFieldSafe("title", fmt.Sprintf("重要新闻%d", i))
 		newsData.SetFieldSafe("content", fmt.Sprintf("这是第%d条重要新闻的内容...", i))
@@ -522,7 +521,7 @@ func errorRecoveryExample() {
 		createValidStockData("600001", "正常股票2", 12.80),
 
 		// 异常的 StructuredData (缺少 schema)
-		&subscriber.StructuredData{
+		&storage.StructuredData{
 			Schema:    nil, // 这会导致错误
 			Values:    map[string]interface{}{"symbol": "600002"},
 			Timestamp: time.Now(),
@@ -575,7 +574,7 @@ func errorRecoveryExample() {
 	// 显示每条保存的数据信息
 	for i, result := range allResults {
 		switch data := result.(type) {
-		case *subscriber.StructuredData:
+		case *storage.StructuredData:
 			symbol, _ := data.GetField("symbol")
 			name, _ := data.GetField("name")
 			fmt.Printf("  记录 %d: StructuredData - %s %s\n", i+1, symbol, name)
@@ -590,33 +589,33 @@ func errorRecoveryExample() {
 }
 
 // 辅助函数：创建交易模式
-func createTradeSchema() *subscriber.DataSchema {
-	return &subscriber.DataSchema{
+func createTradeSchema() *storage.DataSchema {
+	return &storage.DataSchema{
 		Name:        "trade",
 		Description: "交易记录",
-		Fields: map[string]*subscriber.FieldDefinition{
+		Fields: map[string]*storage.FieldDefinition{
 			"trade_id": {
-				Name: "trade_id", Type: subscriber.FieldTypeString,
+				Name: "trade_id", Type: storage.FieldTypeString,
 				Description: "交易ID", Required: true,
 			},
 			"symbol": {
-				Name: "symbol", Type: subscriber.FieldTypeString,
+				Name: "symbol", Type: storage.FieldTypeString,
 				Description: "股票代码", Required: true,
 			},
 			"side": {
-				Name: "side", Type: subscriber.FieldTypeString,
+				Name: "side", Type: storage.FieldTypeString,
 				Description: "买卖方向", Required: true,
 			},
 			"quantity": {
-				Name: "quantity", Type: subscriber.FieldTypeInt,
+				Name: "quantity", Type: storage.FieldTypeInt,
 				Description: "数量", Required: true,
 			},
 			"price": {
-				Name: "price", Type: subscriber.FieldTypeFloat64,
+				Name: "price", Type: storage.FieldTypeFloat64,
 				Description: "价格", Required: true,
 			},
 			"trade_time": {
-				Name: "trade_time", Type: subscriber.FieldTypeTime,
+				Name: "trade_time", Type: storage.FieldTypeTime,
 				Description: "交易时间", Required: true,
 			},
 		},
@@ -625,37 +624,37 @@ func createTradeSchema() *subscriber.DataSchema {
 }
 
 // 辅助函数：创建订单模式
-func createOrderSchema() *subscriber.DataSchema {
-	return &subscriber.DataSchema{
+func createOrderSchema() *storage.DataSchema {
+	return &storage.DataSchema{
 		Name:        "order",
 		Description: "订单记录",
-		Fields: map[string]*subscriber.FieldDefinition{
+		Fields: map[string]*storage.FieldDefinition{
 			"order_id": {
-				Name: "order_id", Type: subscriber.FieldTypeString,
+				Name: "order_id", Type: storage.FieldTypeString,
 				Description: "订单ID", Required: true,
 			},
 			"symbol": {
-				Name: "symbol", Type: subscriber.FieldTypeString,
+				Name: "symbol", Type: storage.FieldTypeString,
 				Description: "股票代码", Required: true,
 			},
 			"side": {
-				Name: "side", Type: subscriber.FieldTypeString,
+				Name: "side", Type: storage.FieldTypeString,
 				Description: "买卖方向", Required: true,
 			},
 			"quantity": {
-				Name: "quantity", Type: subscriber.FieldTypeInt,
+				Name: "quantity", Type: storage.FieldTypeInt,
 				Description: "数量", Required: true,
 			},
 			"price": {
-				Name: "price", Type: subscriber.FieldTypeFloat64,
+				Name: "price", Type: storage.FieldTypeFloat64,
 				Description: "价格", Required: true,
 			},
 			"status": {
-				Name: "status", Type: subscriber.FieldTypeString,
+				Name: "status", Type: storage.FieldTypeString,
 				Description: "订单状态", Required: true,
 			},
 			"order_time": {
-				Name: "order_time", Type: subscriber.FieldTypeTime,
+				Name: "order_time", Type: storage.FieldTypeTime,
 				Description: "下单时间", Required: true,
 			},
 		},
@@ -664,29 +663,29 @@ func createOrderSchema() *subscriber.DataSchema {
 }
 
 // 辅助函数：创建新闻模式
-func createNewsSchema() *subscriber.DataSchema {
-	return &subscriber.DataSchema{
+func createNewsSchema() *storage.DataSchema {
+	return &storage.DataSchema{
 		Name:        "news",
 		Description: "新闻数据",
-		Fields: map[string]*subscriber.FieldDefinition{
+		Fields: map[string]*storage.FieldDefinition{
 			"news_id": {
-				Name: "news_id", Type: subscriber.FieldTypeString,
+				Name: "news_id", Type: storage.FieldTypeString,
 				Description: "新闻ID", Required: true,
 			},
 			"title": {
-				Name: "title", Type: subscriber.FieldTypeString,
+				Name: "title", Type: storage.FieldTypeString,
 				Description: "标题", Required: true,
 			},
 			"content": {
-				Name: "content", Type: subscriber.FieldTypeString,
+				Name: "content", Type: storage.FieldTypeString,
 				Description: "内容", Required: true,
 			},
 			"source": {
-				Name: "source", Type: subscriber.FieldTypeString,
+				Name: "source", Type: storage.FieldTypeString,
 				Description: "来源", Required: true,
 			},
 			"publish_time": {
-				Name: "publish_time", Type: subscriber.FieldTypeTime,
+				Name: "publish_time", Type: storage.FieldTypeTime,
 				Description: "发布时间", Required: true,
 			},
 		},
@@ -695,8 +694,8 @@ func createNewsSchema() *subscriber.DataSchema {
 }
 
 // 辅助函数：创建有效的股票数据
-func createValidStockData(symbol, name string, price float64) *subscriber.StructuredData {
-	stockData := subscriber.NewStructuredData(subscriber.StockDataSchema)
+func createValidStockData(symbol, name string, price float64) *storage.StructuredData {
+	stockData := storage.NewStructuredData(storage.StockDataSchema)
 	stockData.SetFieldSafe("symbol", symbol)
 	stockData.SetFieldSafe("name", name)
 	stockData.SetFieldSafe("price", price)

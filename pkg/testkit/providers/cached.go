@@ -6,16 +6,17 @@ import (
 	"sync"
 	"time"
 
+	"stocksub/pkg/cache"
+	"stocksub/pkg/core"
 	"stocksub/pkg/provider/tencent"
-	"stocksub/pkg/subscriber"
-	"stocksub/pkg/testkit/core"
+	"stocksub/pkg/testkit"
 )
 
 // CachedProvider 缓存包装的Provider
 type CachedProvider struct {
-	realProvider core.Provider
+	realProvider *TencentProviderWrapper
 	mockProvider *MockProvider
-	cache        core.Cache
+	cache        cache.Cache
 	mu           sync.RWMutex
 	config       CachedProviderConfig
 	stats        CachedProviderStats
@@ -44,7 +45,7 @@ type CachedProviderStats struct {
 }
 
 // NewCachedProvider 创建缓存Provider
-func NewCachedProvider(realProvider core.Provider, cache core.Cache, config CachedProviderConfig) *CachedProvider {
+func NewCachedProvider(realProvider *TencentProviderWrapper, cache cache.Cache, config CachedProviderConfig) *CachedProvider {
 	// 创建Mock Provider
 	mockConfig := DefaultMockProviderConfig()
 	mockProvider := NewMockProvider(mockConfig)
@@ -60,7 +61,7 @@ func NewCachedProvider(realProvider core.Provider, cache core.Cache, config Cach
 }
 
 // FetchData 获取股票数据
-func (cp *CachedProvider) FetchData(ctx context.Context, symbols []string) ([]subscriber.StockData, error) {
+func (cp *CachedProvider) FetchData(ctx context.Context, symbols []string) ([]core.StockData, error) {
 	startTime := time.Now()
 	cp.stats.TotalRequests++
 	cp.stats.LastRequest = startTime
@@ -76,7 +77,7 @@ func (cp *CachedProvider) FetchData(ctx context.Context, symbols []string) ([]su
 	if cached, err := cp.cache.Get(ctx, cacheKey); err == nil {
 		cp.stats.CacheHits++
 		cp.updateLatency(time.Since(startTime))
-		return cached.([]subscriber.StockData), nil
+		return cached.([]core.StockData), nil
 	}
 
 	cp.stats.CacheMisses++
@@ -123,7 +124,7 @@ func (cp *CachedProvider) SetMockMode(enabled bool) {
 }
 
 // SetMockData 设置Mock数据
-func (cp *CachedProvider) SetMockData(symbols []string, data []subscriber.StockData) {
+func (cp *CachedProvider) SetMockData(symbols []string, data []core.StockData) {
 	if cp.mockProvider != nil {
 		cp.mockProvider.SetMockData(symbols, data)
 	}
@@ -166,7 +167,7 @@ func (cp *CachedProvider) GetMockProvider() *MockProvider {
 }
 
 // fetchFromRealProvider 从真实Provider获取数据（带重试）
-func (cp *CachedProvider) fetchFromRealProvider(ctx context.Context, symbols []string) ([]subscriber.StockData, error) {
+func (cp *CachedProvider) fetchFromRealProvider(ctx context.Context, symbols []string) ([]core.StockData, error) {
 	var lastErr error
 
 	for attempt := 0; attempt <= cp.config.MaxRetries; attempt++ {
@@ -216,18 +217,18 @@ func (cp *CachedProvider) updateLatency(duration time.Duration) {
 
 // TencentProviderWrapper 腾讯Provider包装器
 type TencentProviderWrapper struct {
-	client *tencent.Provider
+	client *tencent.Client
 	mu     sync.Mutex
 }
 
 // FetchData 获取股票数据
-func (tpw *TencentProviderWrapper) FetchData(ctx context.Context, symbols []string) ([]subscriber.StockData, error) {
+func (tpw *TencentProviderWrapper) FetchData(ctx context.Context, symbols []string) ([]core.StockData, error) {
 	tpw.mu.Lock()
 	defer tpw.mu.Unlock()
 
 	// 如果客户端未初始化，进行初始化
 	if tpw.client == nil {
-		tpw.client = tencent.NewProvider()
+		tpw.client = tencent.NewClient()
 	}
 
 	// 调用腾讯API
@@ -240,7 +241,7 @@ func (tpw *TencentProviderWrapper) SetMockMode(enabled bool) {
 }
 
 // SetMockData 设置Mock数据（腾讯Provider不支持）
-func (tpw *TencentProviderWrapper) SetMockData(symbols []string, data []subscriber.StockData) {
+func (tpw *TencentProviderWrapper) SetMockData(symbols []string, data []core.StockData) {
 	// 腾讯Provider不支持Mock数据设置
 }
 
@@ -252,11 +253,11 @@ func (tpw *TencentProviderWrapper) Close() error {
 
 // ProviderFactory Provider工厂
 type ProviderFactory struct {
-	cache core.Cache
+	cache cache.Cache
 }
 
 // NewProviderFactory 创建Provider工厂
-func NewProviderFactory(cache core.Cache) *ProviderFactory {
+func NewProviderFactory(cache cache.Cache) *ProviderFactory {
 	return &ProviderFactory{
 		cache: cache,
 	}
@@ -273,27 +274,27 @@ func (pf *ProviderFactory) CreateCachedProvider(config CachedProviderConfig) *Ca
 }
 
 // CreateRealProvider 创建真实Provider
-func (pf *ProviderFactory) CreateRealProvider() core.Provider {
+func (pf *ProviderFactory) CreateRealProvider() *TencentProviderWrapper {
 	return &TencentProviderWrapper{}
 }
 
 // ProviderManager Provider管理器
 type ProviderManager struct {
-	providers map[string]core.Provider
+	providers map[string]testkit.MockProvider
 	mu        sync.RWMutex
 	factory   *ProviderFactory
 }
 
 // NewProviderManager 创建Provider管理器
-func NewProviderManager(cache core.Cache) *ProviderManager {
+func NewProviderManager(cache cache.Cache) *ProviderManager {
 	return &ProviderManager{
-		providers: make(map[string]core.Provider),
+		providers: make(map[string]testkit.MockProvider),
 		factory:   NewProviderFactory(cache),
 	}
 }
 
 // RegisterProvider 注册Provider
-func (pm *ProviderManager) RegisterProvider(name string, provider core.Provider) {
+func (pm *ProviderManager) RegisterProvider(name string, provider testkit.MockProvider) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
@@ -301,7 +302,7 @@ func (pm *ProviderManager) RegisterProvider(name string, provider core.Provider)
 }
 
 // GetProvider 获取Provider
-func (pm *ProviderManager) GetProvider(name string) (core.Provider, bool) {
+func (pm *ProviderManager) GetProvider(name string) (testkit.MockProvider, bool) {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
 
@@ -332,7 +333,7 @@ func (pm *ProviderManager) CloseAll() error {
 		}
 	}
 
-	pm.providers = make(map[string]core.Provider)
+	pm.providers = make(map[string]testkit.MockProvider)
 
 	if len(errs) > 0 {
 		return fmt.Errorf("关闭Provider时发生错误: %v", errs)

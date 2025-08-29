@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"stocksub/pkg/core"
 	"stocksub/pkg/logger"
 	"stocksub/pkg/provider/tencent"
 	"stocksub/pkg/subscriber"
@@ -24,7 +25,7 @@ func main() {
 	log.Debug("Debug mode enabled")
 
 	// 1. 创建腾讯数据提供商
-	provider := tencent.NewProvider()
+	provider := tencent.NewClient()
 	log.Debug("Created tencent provider")
 
 	// 2. 创建订阅器
@@ -47,7 +48,7 @@ func main() {
 
 	for _, symbol := range symbols {
 		log.Debugf("Subscribing to symbol: %s", symbol)
-		err := sub.Subscribe(symbol, 5*time.Second, func(data subscriber.StockData) error {
+		err := sub.Subscribe(symbol, 5*time.Second, func(data core.StockData) error {
 			fmt.Printf("[%s] %s (%s): %.2f %+.2f (%.2f%%) 量:%d 买一:%.2f(%d) 卖一:%.2f(%d)\n",
 				data.Timestamp.Format("15:04:05"),
 				data.Symbol,

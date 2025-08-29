@@ -3,9 +3,9 @@ package decorators
 import (
 	"context"
 	"fmt"
+	"stocksub/pkg/core"
 	"stocksub/pkg/limiter"
-	"stocksub/pkg/provider/core"
-	"stocksub/pkg/subscriber"
+	"stocksub/pkg/provider"
 	"stocksub/pkg/timing"
 	"sync"
 	"time"
@@ -38,7 +38,7 @@ type FrequencyControlConfig struct {
 }
 
 // NewFrequencyControlProvider 创建频率控制装饰器
-func NewFrequencyControlProvider(stockProvider core.RealtimeStockProvider, config *FrequencyControlConfig) *FrequencyControlProvider {
+func NewFrequencyControlProvider(stockProvider provider.RealtimeStockProvider, config *FrequencyControlConfig) *FrequencyControlProvider {
 	if config == nil {
 		config = &FrequencyControlConfig{
 			MinInterval: 200 * time.Millisecond, // 默认最小间隔200ms
@@ -78,7 +78,7 @@ func (f *FrequencyControlProvider) IsHealthy() bool {
 }
 
 // FetchStockData 实现带频率控制的股票数据获取
-func (f *FrequencyControlProvider) FetchStockData(ctx context.Context, symbols []string) ([]subscriber.StockData, error) {
+func (f *FrequencyControlProvider) FetchStockData(ctx context.Context, symbols []string) ([]core.StockData, error) {
 	if !f.isActive {
 		// 如果频率控制未激活，直接调用基础提供商
 		return f.stockProvider.FetchStockData(ctx, symbols)
@@ -92,7 +92,7 @@ func (f *FrequencyControlProvider) FetchStockData(ctx context.Context, symbols [
 }
 
 // FetchStockDataWithRaw 实现带频率控制的股票数据获取（包含原始数据）
-func (f *FrequencyControlProvider) FetchStockDataWithRaw(ctx context.Context, symbols []string) ([]subscriber.StockData, string, error) {
+func (f *FrequencyControlProvider) FetchStockDataWithRaw(ctx context.Context, symbols []string) ([]core.StockData, string, error) {
 	if !f.isActive {
 		return f.stockProvider.FetchStockDataWithRaw(ctx, symbols)
 	}
@@ -102,7 +102,7 @@ func (f *FrequencyControlProvider) FetchStockDataWithRaw(ctx context.Context, sy
 }
 
 // fetchWithIntelligentRetry 执行带智能重试的数据获取
-func (f *FrequencyControlProvider) fetchWithIntelligentRetry(ctx context.Context, symbols []string) ([]subscriber.StockData, error) {
+func (f *FrequencyControlProvider) fetchWithIntelligentRetry(ctx context.Context, symbols []string) ([]core.StockData, error) {
 	for attempt := 0; attempt <= f.maxRetries; attempt++ {
 		// 检查是否可以继续
 		shouldProceed, err := f.limiter.ShouldProceed(ctx)
@@ -159,7 +159,7 @@ func (f *FrequencyControlProvider) fetchWithIntelligentRetry(ctx context.Context
 }
 
 // fetchWithRawAndRetry 执行带原始数据和智能重试的数据获取
-func (f *FrequencyControlProvider) fetchWithRawAndRetry(ctx context.Context, symbols []string) ([]subscriber.StockData, string, error) {
+func (f *FrequencyControlProvider) fetchWithRawAndRetry(ctx context.Context, symbols []string) ([]core.StockData, string, error) {
 	for attempt := 0; attempt <= f.maxRetries; attempt++ {
 		shouldProceed, err := f.limiter.ShouldProceed(ctx)
 		if !shouldProceed {

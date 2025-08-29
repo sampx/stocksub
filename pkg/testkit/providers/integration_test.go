@@ -9,7 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"stocksub/pkg/testkit/cache"
+
+	"stocksub/pkg/cache"
 	"stocksub/pkg/testkit/providers"
 )
 

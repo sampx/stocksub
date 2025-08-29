@@ -8,7 +8,6 @@ import (
 	"stocksub/pkg/logger"
 	"stocksub/pkg/message"
 	"stocksub/pkg/provider"
-	"stocksub/pkg/provider/core"
 	"stocksub/pkg/scheduler"
 
 	"github.com/go-redis/redis/v8"
@@ -44,7 +43,7 @@ func (e *FetcherExecutor) Execute(ctx context.Context, job *scheduler.Job) error
 	e.log.Debugf("任务参数: %+v", job.Config.Params)
 
 	// 根据提供商类型获取提供商
-	var provider core.RealtimeStockProvider
+	var provider provider.RealtimeStockProvider
 	var err error
 
 	e.log.Debugf("获取提供商: type=%s, name=%s", job.Config.Provider.Type, job.Config.Provider.Name)

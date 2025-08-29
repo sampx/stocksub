@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"stocksub/pkg/subscriber"
+	"stocksub/pkg/core"
 
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
@@ -85,14 +85,14 @@ func gbkToUtf8(gbkStr string) string {
 }
 
 // parseTencentData 解析腾讯返回的数据
-func parseTencentData(data string) []subscriber.StockData {
+func parseTencentData(data string) []core.StockData {
 	if data == "" {
-		return []subscriber.StockData{}
+		return []core.StockData{}
 	}
 
 	data = strings.TrimSpace(data)
 	stocks := strings.Split(data, ";")
-	results := make([]subscriber.StockData, 0, len(stocks))
+	results := make([]core.StockData, 0, len(stocks))
 
 	for _, stock := range stocks {
 		stock = strings.TrimSpace(stock)
@@ -113,7 +113,7 @@ func parseTencentData(data string) []subscriber.StockData {
 			continue
 		}
 
-		stockData := subscriber.StockData{
+		stockData := core.StockData{
 			// 基本信息
 			Symbol:        extractSymbol(fields[FieldSymbol]),
 			Name:          gbkToUtf8(fields[FieldName]),

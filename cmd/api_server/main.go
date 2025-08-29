@@ -19,8 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"stocksub/pkg/testkit/cache"
-	"stocksub/pkg/testkit/core"
+	"stocksub/pkg/cache"
 )
 
 var (
@@ -39,7 +38,7 @@ type APIServer struct {
 	queryAPI     api.QueryAPI
 	logger       *logrus.Logger
 	server       *http.Server
-	cache        core.Cache // 集成分层缓存
+	cache        cache.Cache // 集成分层缓存
 }
 
 type Config struct {
@@ -252,7 +251,7 @@ func NewAPIServer(config *Config, logger *logrus.Logger) (*APIServer, error) {
 	queryAPI := influxClient.QueryAPI(config.InfluxDB.Org)
 
 	// 创建分层缓存
-	var apiCache core.Cache
+	var apiCache cache.Cache
 	if config.Cache.Enabled {
 		cacheConfig := cache.LayeredCacheConfig{
 			Layers: []cache.LayerConfig{

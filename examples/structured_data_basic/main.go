@@ -6,9 +6,8 @@ import (
 	"log"
 	"time"
 
-	"stocksub/pkg/subscriber"
-	"stocksub/pkg/testkit/core"
-	"stocksub/pkg/testkit/storage"
+	"stocksub/pkg/core"
+	"stocksub/pkg/storage"
 )
 
 func main() {
@@ -38,7 +37,7 @@ func basicExample() {
 	fmt.Println("\n--- 示例1：基本操作 ---")
 
 	// 使用预定义的股票数据模式创建结构化数据
-	stockData := subscriber.NewStructuredData(subscriber.StockDataSchema)
+	stockData := storage.NewStructuredData(storage.StockDataSchema)
 
 	// 设置字段值
 	if err := stockData.SetField("symbol", "600000"); err != nil {
@@ -90,25 +89,25 @@ func customSchemaExample() {
 	fmt.Println("\n--- 示例2：自定义数据模式 ---")
 
 	// 定义自定义的交易记录模式
-	tradeSchema := &subscriber.DataSchema{
+	tradeSchema := &storage.DataSchema{
 		Name:        "trade_record",
 		Description: "交易记录",
-		Fields: map[string]*subscriber.FieldDefinition{
+		Fields: map[string]*storage.FieldDefinition{
 			"trade_id": {
 				Name:        "trade_id",
-				Type:        subscriber.FieldTypeString,
+				Type:        storage.FieldTypeString,
 				Description: "交易ID",
 				Required:    true,
 			},
 			"symbol": {
 				Name:        "symbol",
-				Type:        subscriber.FieldTypeString,
+				Type:        storage.FieldTypeString,
 				Description: "股票代码",
 				Required:    true,
 			},
 			"side": {
 				Name:        "side",
-				Type:        subscriber.FieldTypeString,
+				Type:        storage.FieldTypeString,
 				Description: "买卖方向",
 				Required:    true,
 				Validator: func(value interface{}) error {
@@ -122,26 +121,26 @@ func customSchemaExample() {
 			},
 			"quantity": {
 				Name:        "quantity",
-				Type:        subscriber.FieldTypeInt,
+				Type:        storage.FieldTypeInt,
 				Description: "交易数量",
 				Required:    true,
 			},
 			"price": {
 				Name:        "price",
-				Type:        subscriber.FieldTypeFloat64,
+				Type:        storage.FieldTypeFloat64,
 				Description: "交易价格",
 				Required:    true,
 			},
 			"commission": {
 				Name:         "commission",
-				Type:         subscriber.FieldTypeFloat64,
+				Type:         storage.FieldTypeFloat64,
 				Description:  "佣金",
 				Required:     false,
 				DefaultValue: 0.0,
 			},
 			"trade_time": {
 				Name:        "trade_time",
-				Type:        subscriber.FieldTypeTime,
+				Type:        storage.FieldTypeTime,
 				Description: "交易时间",
 				Required:    true,
 			},
@@ -150,13 +149,13 @@ func customSchemaExample() {
 	}
 
 	// 验证自定义模式
-	if err := subscriber.ValidateSchema(tradeSchema); err != nil {
+	if err := storage.ValidateSchema(tradeSchema); err != nil {
 		log.Fatalf("模式验证失败: %v", err)
 	}
 	fmt.Println("自定义模式验证通过!")
 
 	// 创建交易记录
-	trade := subscriber.NewStructuredData(tradeSchema)
+	trade := storage.NewStructuredData(tradeSchema)
 
 	// 设置交易数据
 	trade.SetFieldSafe("trade_id", "T20250825001")
@@ -181,32 +180,32 @@ func customSchemaExample() {
 func validationExample() {
 	fmt.Println("\n--- 示例3：数据验证和错误处理 ---")
 
-	stockData := subscriber.NewStructuredData(subscriber.StockDataSchema)
+	stockData := storage.NewStructuredData(storage.StockDataSchema)
 
 	// 演示各种验证错误
 	fmt.Println("演示验证错误:")
 
 	// 1. 无效字段名
 	if err := stockData.SetField("invalid_field", "test"); err != nil {
-		if structErr, ok := err.(*subscriber.StructuredDataError); ok {
+		if structErr, ok := err.(*storage.StructuredDataError); ok {
 			fmt.Printf("错误类型: %s, 字段: %s, 消息: %s\n",
-				structErr.Code, structErr.Field, structErr.Message)
+				structErr.Code, structErr.Context["field"], structErr.Message)
 		}
 	}
 
 	// 2. 无效字段类型
 	if err := stockData.SetField("price", "not_a_number"); err != nil {
-		if structErr, ok := err.(*subscriber.StructuredDataError); ok {
+		if structErr, ok := err.(*storage.StructuredDataError); ok {
 			fmt.Printf("错误类型: %s, 字段: %s, 消息: %s\n",
-				structErr.Code, structErr.Field, structErr.Message)
+				structErr.Code, structErr.Context["field"], structErr.Message)
 		}
 	}
 
 	// 3. 使用安全设置方法（包含范围验证）
 	if err := stockData.SetFieldSafe("price", -10.0); err != nil {
-		if structErr, ok := err.(*subscriber.StructuredDataError); ok {
+		if structErr, ok := err.(*storage.StructuredDataError); ok {
 			fmt.Printf("错误类型: %s, 字段: %s, 消息: %s\n",
-				structErr.Code, structErr.Field, structErr.Message)
+				structErr.Code, structErr.Context["field"], structErr.Message)
 		}
 	}
 
@@ -243,7 +242,7 @@ func storageIntegrationExample() {
 	prices := []float64{10.50, 12.80, 25.30}
 
 	for i, symbol := range symbols {
-		stockData := subscriber.NewStructuredData(subscriber.StockDataSchema)
+		stockData := storage.NewStructuredData(storage.StockDataSchema)
 		stockData.SetFieldSafe("symbol", symbol)
 		stockData.SetFieldSafe("name", names[i])
 		stockData.SetFieldSafe("price", prices[i])
@@ -306,7 +305,7 @@ func batchProcessingExample() {
 	var stockDataList []interface{}
 
 	for i := 0; i < 10; i++ {
-		stockData := subscriber.NewStructuredData(subscriber.StockDataSchema)
+		stockData := storage.NewStructuredData(storage.StockDataSchema)
 		stockData.SetFieldSafe("symbol", fmt.Sprintf("60000%d", i))
 		stockData.SetFieldSafe("name", fmt.Sprintf("测试股票%d", i))
 		stockData.SetFieldSafe("price", float64(10+i))
@@ -350,7 +349,7 @@ func stockDataConversionExample() {
 	fmt.Println("\n--- 示例6：StockData 转换示例 ---")
 
 	// 创建传统的 StockData
-	originalStock := subscriber.StockData{
+	originalStock := core.StockData{
 		Symbol:        "600000",
 		Name:          "浦发银行",
 		Price:         10.50,
@@ -368,7 +367,7 @@ func stockDataConversionExample() {
 		originalStock.Symbol, originalStock.Name, originalStock.Price)
 
 	// 转换为 StructuredData
-	structuredData, err := subscriber.StockDataToStructuredData(originalStock)
+	structuredData, err := storage.StockDataToStructuredData(originalStock)
 	if err != nil {
 		log.Fatalf("转换为 StructuredData 失败: %v", err)
 	}
@@ -382,7 +381,7 @@ func stockDataConversionExample() {
 	fmt.Printf("StructuredData 中的数据: %s %s %.2f\n", symbol, name, price)
 
 	// 转换回 StockData
-	convertedStock, err := subscriber.StructuredDataToStockData(structuredData)
+	convertedStock, err := storage.StructuredDataToStockData(structuredData)
 	if err != nil {
 		log.Fatalf("转换回 StockData 失败: %v", err)
 	}

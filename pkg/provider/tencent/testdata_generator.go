@@ -3,9 +3,10 @@ package tencent
 import (
 	"fmt"
 	"math/rand"
-	"stocksub/pkg/subscriber"
 	"strings"
 	"time"
+
+	"stocksub/pkg/core"
 )
 
 // TencentDataGenerator 腾讯API数据生成器
@@ -320,7 +321,7 @@ func (g *TencentDataGenerator) generateCirculation() float64 {
 }
 
 // GenerateStockData 生成 StockData 结构
-func (g *TencentDataGenerator) GenerateStockData(symbols []string) []subscriber.StockData {
+func (g *TencentDataGenerator) GenerateStockData(symbols []string) []core.StockData {
 	response := g.GenerateTencentResponse(symbols)
 	return parseTencentData(response)
 }

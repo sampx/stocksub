@@ -3,8 +3,8 @@ package decorators
 import (
 	"context"
 	"fmt"
-	"stocksub/pkg/provider/core"
-	"stocksub/pkg/subscriber"
+	"stocksub/pkg/core"
+	"stocksub/pkg/provider"
 	"sync"
 	"time"
 
@@ -56,7 +56,7 @@ func DefaultCircuitBreakerConfig() *CircuitBreakerConfig {
 }
 
 // NewCircuitBreakerProvider 创建熔断器装饰器
-func NewCircuitBreakerProvider(stockProvider core.RealtimeStockProvider, config *CircuitBreakerConfig) *CircuitBreakerProvider {
+func NewCircuitBreakerProvider(stockProvider provider.RealtimeStockProvider, config *CircuitBreakerConfig) *CircuitBreakerProvider {
 	if config == nil {
 		config = DefaultCircuitBreakerConfig()
 	}
@@ -104,7 +104,7 @@ func (c *CircuitBreakerProvider) IsHealthy() bool {
 }
 
 // FetchStockData 实现带熔断器的股票数据获取
-func (c *CircuitBreakerProvider) FetchStockData(ctx context.Context, symbols []string) ([]subscriber.StockData, error) {
+func (c *CircuitBreakerProvider) FetchStockData(ctx context.Context, symbols []string) ([]core.StockData, error) {
 	if !c.config.Enabled {
 		// 如果熔断器未启用，直接调用基础提供商
 		return c.stockProvider.FetchStockData(ctx, symbols)
@@ -128,7 +128,7 @@ func (c *CircuitBreakerProvider) FetchStockData(ctx context.Context, symbols []s
 	}
 
 	// 类型断言转换结果
-	data, ok := result.([]subscriber.StockData)
+	data, ok := result.([]core.StockData)
 	if !ok {
 		err := fmt.Errorf("熔断器返回数据类型错误")
 		c.handleResult(err)
@@ -139,7 +139,7 @@ func (c *CircuitBreakerProvider) FetchStockData(ctx context.Context, symbols []s
 }
 
 // FetchStockDataWithRaw 实现带熔断器的股票数据获取（包含原始数据）
-func (c *CircuitBreakerProvider) FetchStockDataWithRaw(ctx context.Context, symbols []string) ([]subscriber.StockData, string, error) {
+func (c *CircuitBreakerProvider) FetchStockDataWithRaw(ctx context.Context, symbols []string) ([]core.StockData, string, error) {
 	if !c.config.Enabled {
 		return c.stockProvider.FetchStockDataWithRaw(ctx, symbols)
 	}
@@ -150,7 +150,7 @@ func (c *CircuitBreakerProvider) FetchStockDataWithRaw(ctx context.Context, symb
 
 	// 定义包装结果结构
 	type Result struct {
-		Data []subscriber.StockData
+		Data []core.StockData
 		Raw  string
 	}
 

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"stocksub/pkg/testkit/cache"
-	"stocksub/pkg/testkit/core"
+	"stocksub/pkg/cache"
+	"stocksub/pkg/testkit"
 )
 
 // concurrencyDemo 并发安全性演示
@@ -97,7 +97,7 @@ func errorHandlingDemo(ctx context.Context) {
 	fmt.Printf("\n   1. 缓存未命中错误:\n")
 	_, err := memCache.Get(ctx, "nonexistent-key")
 	if err != nil {
-		if testKitErr, ok := err.(*core.TestKitError); ok {
+		if testKitErr, ok := err.(*testkit.TestKitError); ok {
 			fmt.Printf("     ✓ 捕获到TestKit错误: %s - %s\n", testKitErr.Code, testKitErr.Message)
 		}
 	}

@@ -6,9 +6,9 @@ import (
 	"log"
 	"os"
 
-	"stocksub/pkg/subscriber"
-	"stocksub/pkg/testkit"
+	"stocksub/pkg/core"
 	"stocksub/pkg/testkit/config"
+	"stocksub/pkg/testkit/manager"
 )
 
 func main() {
@@ -35,7 +35,7 @@ func main() {
 			Directory: tempDir,
 		},
 	}
-	manager := testkit.NewTestDataManager(cfg)
+	manager := manager.NewTestDataManager(cfg)
 	defer manager.Close()
 
 	// --- 2. 演示 MockProvider 的自动数据生成 ---
@@ -57,7 +57,7 @@ func main() {
 	// --- 3. 演示设置特定Mock数据以覆盖自动生成 ---
 	fmt.Println("\n3. 设置特定Mock数据...")
 	symbols := []string{"SPECIFIC001", "AUTO003"} // 一个特定的，一个继续自动生成
-	specificData := []subscriber.StockData{
+	specificData := []core.StockData{
 		{
 			Symbol: "SPECIFIC001",
 			Name:   "指定的模拟股票",

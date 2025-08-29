@@ -8,17 +8,16 @@ import (
 	"time"
 
 	"stocksub/pkg/config"
+	"stocksub/pkg/core"
 	"stocksub/pkg/logger"
 	"stocksub/pkg/provider"
 	"stocksub/pkg/provider/decorators"
 	"stocksub/pkg/provider/tencent"
 	"stocksub/pkg/subscriber"
-
-	"github.com/sirupsen/logrus"
 )
 
 // 全局日志记录器
-var log *logrus.Entry
+var log *logger.Entry
 
 func main() {
 	// 初始化配置
@@ -27,7 +26,7 @@ func main() {
 	// 初始化日志系统
 	loggerConfig := logger.Config{
 		Level:  cfg.Logger.Level,
-		Format: "text", // 使用文本格式
+		Format: cfg.Logger.Format, // 使用文本格式
 	}
 	logger.Init(loggerConfig)
 
@@ -36,26 +35,26 @@ func main() {
 
 	log.Infof("StockSub starting...")
 
-	// 创建 ProviderManager (新架构)
+	// 创建 ProviderManager
 	providerManager := provider.NewProviderManager()
 
 	// 创建腾讯数据提供商
-	tencentProvider := tencent.NewProvider()
+	tencentProvider := tencent.NewClient()
 
 	// 应用装饰器增强功能
-	log.Infof("应用装饰器增强...")
+	log.Debug("应用装饰器增强...")
 	decoratorConfig := decorators.DefaultDecoratorConfig() // 使用默认装饰器配置
 	decoratedProvider, decoratorErr := decorators.CreateDecoratedProvider(tencentProvider, decoratorConfig)
 	if decoratorErr != nil {
 		log.Warnf("装饰器创建失败，回退到原始提供商: %v", decoratorErr)
 		decoratedProvider = tencentProvider // 回退
 	} else {
-		log.Infof("装饰器应用成功: %s", decoratedProvider.Name())
+		log.Debugf("装饰器应用成功: %s", decoratedProvider.Name())
 
 		// 输出装饰器状态信息
 		if statusProvider, ok := decoratedProvider.(interface{ GetStatus() map[string]interface{} }); ok {
 			status := statusProvider.GetStatus()
-			log.Infof("装饰器状态: 类型=%v, 启用=%v", status["decorator_type"], status["enabled"])
+			log.Debugf("装饰器状态: 类型=%v, 启用=%v", status["decorator_type"], status["enabled"])
 		}
 	}
 
@@ -102,7 +101,7 @@ func main() {
 	symbols := []string{"600000", "000001", "00700", "AAPL"}
 
 	for _, symbol := range symbols {
-		err := manager.Subscribe(symbol, 6*time.Second, func(data subscriber.StockData) error {
+		err := manager.Subscribe(symbol, 6*time.Second, func(data core.StockData) error {
 			log.Infof("收到 %s (%s) 数据: 价格=%.2f, 涨跌=%+.2f (%.2f%%), 成交量=%d, 买一=%.2f(%d), 卖一=%.2f(%d), 时间=%s",
 				data.Symbol, data.Name, data.Price, data.Change, data.ChangePercent,
 				data.Volume, data.BidPrice1, data.BidVolume1, data.AskPrice1, data.AskVolume1,
@@ -126,7 +125,9 @@ func main() {
 	<-c
 
 	log.Infof("收到退出信号，正在关闭...")
-	manager.Stop()
+	if err := manager.Stop(); err != nil {
+		log.Warnf("Error stopping manager: %v", err)
+	}
 
 	// 清理 ProviderManager
 	if err := providerManager.Close(); err != nil {

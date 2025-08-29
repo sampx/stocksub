@@ -15,7 +15,7 @@ import (
 
 	"stocksub/pkg/limiter"
 	"stocksub/pkg/provider/tencent"
-	"stocksub/pkg/testkit/storage"
+	"stocksub/pkg/storage"
 	"stocksub/pkg/timing"
 )
 
@@ -42,7 +42,7 @@ type PerformanceMetric struct {
 // APIMonitor API监控器
 type APIMonitor struct {
 	config   MonitorConfig
-	provider *tencent.Provider
+	provider *tencent.Client
 	storage  *storage.CSVStorage
 	logger   *log.Logger
 	logFile  *os.File
@@ -159,9 +159,9 @@ func NewAPIMonitor(config MonitorConfig) (*APIMonitor, error) {
 	logger := log.New(logFile, "[API-MONITOR] ", log.LstdFlags|log.Lmicroseconds)
 
 	// 创建Provider
-	provider := tencent.NewProvider()
-	provider.SetTimeout(30 * time.Second)
-	provider.SetRateLimit(1 * time.Second)
+	provider := tencent.NewClient()
+	// provider.SetTimeout(30 * time.Second)
+	// provider.SetRateLimit(1 * time.Second)
 
 	// 创建存储器
 	storageCfg := storage.DefaultCSVStorageConfig()
@@ -328,7 +328,7 @@ func (m *APIMonitor) collectDataWithLimiter(ctx context.Context, successCount, e
 	queryTime := time.Now()
 
 	// 一次API调用获取所有股票数据
-	result, rawData, err := m.provider.FetchDataWithRaw(ctx, m.config.Symbols)
+	result, err := m.provider.FetchData(ctx, m.config.Symbols)
 
 	responseTime := time.Now()
 	requestDuration := responseTime.Sub(queryTime)
@@ -338,7 +338,6 @@ func (m *APIMonitor) collectDataWithLimiter(ctx context.Context, successCount, e
 		Timestamp:         queryTime,
 		Symbol:            strings.Join(m.config.Symbols, ","), // 多股票用逗号分隔
 		RequestDurationMs: requestDuration.Milliseconds(),
-		ResponseSizeBytes: int64(len(rawData)),
 		ErrorOccurred:     err != nil,
 		ErrorMessage:      "",
 	}

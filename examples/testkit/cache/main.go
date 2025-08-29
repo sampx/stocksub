@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"stocksub/pkg/testkit/cache"
-	"stocksub/pkg/testkit/core"
+	"stocksub/pkg/cache"
+	"stocksub/pkg/testkit"
 )
 
 func main() {
@@ -157,7 +157,7 @@ func basicCacheDemo(ctx context.Context) {
 	// 获取不存在的键
 	_, err = memCache.Get(ctx, "stock:nonexistent")
 	if err != nil {
-		if testKitErr, ok := err.(*core.TestKitError); ok && testKitErr.Code == core.ErrCacheMiss {
+		if testKitErr, ok := err.(*testkit.TestKitError); ok && testKitErr.Code == cache.ErrCacheMiss {
 			fmt.Printf("   ✓ 缓存未命中(预期行为): stock:nonexistent\n")
 		}
 	}

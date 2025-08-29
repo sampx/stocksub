@@ -5,41 +5,60 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestParseTencentData(t *testing.T) {
 	t.Run("正常解析", func(t *testing.T) {
-		testKit := NewTencentParserTestKit()
-		symbols := []string{"600000", "000001"}
+		// 模拟真实的腾讯API响应格式，使用英文避免编码问题
+		rawData := `v_sh600000="1~PUFA Bank~600000~13.72~13.69~13.69~603222~288503~314720~13.71~1306~13.70~6592~13.69~5682~13.68~1132~13.67~1144~13.72~2111~13.73~261~13.74~1200~13.75~585~13.76~1137~~20250820155202~0.03~0.22~13.87~13.60~13.72/603222/829302744~603222~82930~0.20~8.65~~13.87~13.60~1.97~4152.73~4152.73~0.61~15.06~12.32";`
 
-		data, err := testKit.TestParseValid(symbols)
-		require.NoError(t, err)
-		assert.Len(t, data, 2)
+		data := parseTencentData(rawData)
+		assert.Len(t, data, 1)
 
 		// 验证第一个股票数据
 		stock := data[0]
 		assert.Equal(t, "600000", stock.Symbol)
-		assert.NotEmpty(t, stock.Name)
-		assert.GreaterOrEqual(t, stock.Price, 0.0)
-		assert.GreaterOrEqual(t, stock.Volume, int64(0))
+		assert.Equal(t, "PUFA Bank", stock.Name)
+		assert.Equal(t, 13.72, stock.Price)
+		assert.Equal(t, 13.69, stock.PrevClose)
+		assert.Equal(t, 13.69, stock.Open)
+		assert.Equal(t, int64(603222), stock.Volume)
+	})
+
+	t.Run("多股票解析", func(t *testing.T) {
+		// 测试多股票数据解析，使用英文避免编码问题
+		rawData := `v_sh600000="1~PUFA Bank~600000~13.72~13.69~13.69~603222~288503~314720~13.71~1306~13.70~6592~13.69~5682~13.68~1132~13.67~1144~13.72~2111~13.73~261~13.74~1200~13.75~585~13.76~1137~~20250820155202~0.03~0.22~13.87~13.60~13.72/603222/829302744~603222~82930~0.20~8.65~~13.87~13.60~1.97~4152.73~4152.73~0.61~15.06~12.32";
+v_sz000858="51~Wuliangye~000858~125.80~124.41~124.42~399865~208277~191588~125.78~2335~0.00~599~0.00~0~0.00~0~0.00~0~125.78~2335~0.00~0~0.00~0~0.00~0~0.00~0~~20250820145821~1.39~1.12~126.50~123.35~125.80/399865/5027135558~399865~502714~1.03~14.95~~126.50~123.35~2.53~4882.88~4883.06~3.59~136.85~111.97";`
+
+		data := parseTencentData(rawData)
+		assert.Len(t, data, 2)
+
+		// 验证第一个股票
+		stock1 := data[0]
+		assert.Equal(t, "600000", stock1.Symbol)
+		assert.Equal(t, "PUFA Bank", stock1.Name)
+
+		// 验证第二个股票
+		stock2 := data[1]
+		assert.Equal(t, "000858", stock2.Symbol)
+		assert.Equal(t, "Wuliangye", stock2.Name)
 	})
 
 	t.Run("空数据解析", func(t *testing.T) {
-		testKit := NewTencentParserTestKit()
-		data := testKit.TestParseEmpty()
+		data := parseTencentData("")
 		assert.Len(t, data, 0)
 	})
 
 	t.Run("无效数据解析", func(t *testing.T) {
-		testKit := NewTencentParserTestKit()
-		data := testKit.TestParseInvalid()
+		rawData := "invalid data"
+		data := parseTencentData(rawData)
 		assert.Len(t, data, 0)
 	})
 
 	t.Run("不完整数据解析", func(t *testing.T) {
-		testKit := NewTencentParserTestKit()
-		data := testKit.TestParseIncomplete()
+		// 不完整的数据，字段不足
+		rawData := `v_sh600000="1~PUFA Bank~600000~10.50~10.45";`
+		data := parseTencentData(rawData)
 		assert.Len(t, data, 0, "不完整的数据应该被忽略")
 	})
 }
@@ -297,9 +316,9 @@ func TestFieldConstants(t *testing.T) {
 
 // 基准测试
 func BenchmarkParseTencentData(b *testing.B) {
-	testKit := NewTencentParserTestKit()
-	symbols := []string{"600000", "000001", "300503", "688041", "835174"}
-	response := testKit.generator.GenerateTencentResponse(symbols)
+	// 模拟腾讯API响应数据
+	response := `v_sh600000="1~浦发银行~600000~10.50~10.45~10.60~1000000~500000~500000~10.49~1000~10.48~2000~10.47~3000~10.46~4000~10.45~5000~10.51~1500~10.52~2500~10.53~3500~10.54~4500~10.55~5500~20210101093000~0.05~0.48~10.60~10.40~10.50~50000000~2.00~15.50~0~1.25~100000000~0~0~0~12.45~0";
+v_sz000001="0~平安银行~000001~15.30~15.25~15.35~2000000~600000~600000~15.29~1500~15.28~2500~15.27~3500~15.26~4500~15.25~5500~15.31~1600~15.32~2600~15.33~3600~15.34~4600~15.35~5600~20210101093100~0.05~0.33~15.35~15.20~15.30~80000000~1.80~12.50~0~1.15~150000000~0~0~0~13.20~0";`
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

@@ -2,7 +2,7 @@ package decorators
 
 import (
 	"fmt"
-	"stocksub/pkg/provider/core"
+	"stocksub/pkg/provider"
 	"time"
 
 	"github.com/spf13/viper"
@@ -65,12 +65,12 @@ func (cdc *ConfigurableDecoratorChain) AddDecorator(decoratorConfig DecoratorCon
 }
 
 // Apply 将装饰器链应用到指定的 RealtimeStockProvider
-func (cdc *ConfigurableDecoratorChain) Apply(stockProvider core.RealtimeStockProvider) (core.RealtimeStockProvider, error) {
+func (cdc *ConfigurableDecoratorChain) Apply(provider provider.Provider) (provider.Provider, error) {
 	// 按优先级排序装饰器
 	sortedDecorators := cdc.getSortedEnabledDecorators()
 
 	// 逐个应用装饰器
-	current := stockProvider
+	current := provider
 	for _, decoratorConfig := range sortedDecorators {
 		decorated, err := cdc.factory.CreateRealtimeStockDecorator(decoratorConfig.Type, current, decoratorConfig.Config)
 		if err != nil {
@@ -116,7 +116,7 @@ func (cdc *ConfigurableDecoratorChain) GetAppliedDecorators() []DecoratorType {
 }
 
 // 增强的装饰器工厂，支持配置驱动创建
-func (df *DecoratorFactory) CreateRealtimeStockDecorator(decoratorType DecoratorType, stockProvider core.RealtimeStockProvider, config map[string]interface{}) (core.RealtimeStockProvider, error) {
+func (df *DecoratorFactory) CreateRealtimeStockDecorator(decoratorType DecoratorType, stockProvider provider.RealtimeStockProvider, config map[string]interface{}) (provider.RealtimeStockProvider, error) {
 	switch decoratorType {
 	case FrequencyControlType:
 		return df.createFrequencyControlProvider(stockProvider, config)
@@ -128,7 +128,7 @@ func (df *DecoratorFactory) CreateRealtimeStockDecorator(decoratorType Decorator
 }
 
 // createFrequencyControlProvider 创建频率控制装饰器
-func (df *DecoratorFactory) createFrequencyControlProvider(stockProvider core.RealtimeStockProvider, configMap map[string]interface{}) (core.RealtimeStockProvider, error) {
+func (df *DecoratorFactory) createFrequencyControlProvider(provider provider.Provider, configMap map[string]interface{}) (provider.Provider, error) {
 	config := &FrequencyControlConfig{
 		MinInterval: 200 * time.Millisecond, // 默认值
 		MaxRetries:  3,
@@ -153,11 +153,11 @@ func (df *DecoratorFactory) createFrequencyControlProvider(stockProvider core.Re
 		}
 	}
 
-	return NewFrequencyControlProvider(stockProvider, config), nil
+	return NewFrequencyControlProvider(provider, config), nil
 }
 
 // createCircuitBreakerProvider 创建熔断器装饰器
-func (df *DecoratorFactory) createCircuitBreakerProvider(stockProvider core.RealtimeStockProvider, configMap map[string]interface{}) (core.RealtimeStockProvider, error) {
+func (df *DecoratorFactory) createCircuitBreakerProvider(stockProvider provider.RealtimeStockProvider, configMap map[string]interface{}) (provider.RealtimeStockProvider, error) {
 	config := DefaultCircuitBreakerConfig()
 
 	// 解析配置
@@ -190,7 +190,7 @@ func (df *DecoratorFactory) createCircuitBreakerProvider(stockProvider core.Real
 }
 
 // CreateDecoratedProvider 便捷方法：使用配置创建完全装饰的提供商
-func CreateDecoratedProvider(stockProvider core.RealtimeStockProvider, config ProviderDecoratorConfig) (core.RealtimeStockProvider, error) {
+func CreateDecoratedProvider(stockProvider provider.Provider, config ProviderDecoratorConfig) (provider.Provider, error) {
 	factory := NewDecoratorFactory()
 	chain := NewConfigurableDecoratorChain(factory)
 	chain.LoadFromConfig(config)
@@ -198,7 +198,7 @@ func CreateDecoratedProvider(stockProvider core.RealtimeStockProvider, config Pr
 }
 
 // CreateDecoratedProviderFromViper 便捷方法：从 Viper 配置创建完全装饰的提供商
-func CreateDecoratedProviderFromViper(stockProvider core.RealtimeStockProvider, v *viper.Viper, configKey string) (core.RealtimeStockProvider, error) {
+func CreateDecoratedProviderFromViper(stockProvider provider.RealtimeStockProvider, v *viper.Viper, configKey string) (provider.RealtimeStockProvider, error) {
 	factory := NewDecoratorFactory()
 	chain := NewConfigurableDecoratorChain(factory)
 

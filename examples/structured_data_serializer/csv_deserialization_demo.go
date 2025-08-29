@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"log"
 
-	"stocksub/pkg/subscriber"
+	"stocksub/pkg/storage"
 )
 
 func csvDeserializationDemo() {
 	fmt.Println("=== CSV 反序列化功能演示 ===")
 
 	// 创建CSV序列化器
-	serializer := subscriber.NewStructuredDataSerializer(subscriber.FormatCSV)
+	serializer := storage.NewStructuredDataSerializer(storage.FormatCSV)
 
 	// 模拟从文件读取的CSV数据（包含中文表头）
 	csvData := `股票代码(symbol),股票名称(name),当前价格(price),涨跌额(change),涨跌幅(%)(change_percent),成交量(volume),数据时间(timestamp)
@@ -25,7 +25,7 @@ func csvDeserializationDemo() {
 
 	// 1. 批量反序列化CSV数据
 	fmt.Println("1. 批量反序列化CSV数据:")
-	dataList, err := serializer.DeserializeMultiple([]byte(csvData), subscriber.StockDataSchema)
+	dataList, err := serializer.DeserializeMultiple([]byte(csvData), storage.StockDataSchema)
 	if err != nil {
 		log.Fatalf("反序列化失败: %v", err)
 	}
@@ -49,7 +49,7 @@ func csvDeserializationDemo() {
 	singleCSV := `股票代码(symbol),股票名称(name),当前价格(price),数据时间(timestamp)
 600519,贵州茅台,1680.50,2025-08-24 19:00:00`
 
-	singleData := subscriber.NewStructuredData(subscriber.StockDataSchema)
+	singleData := storage.NewStructuredData(storage.StockDataSchema)
 	err = serializer.Deserialize([]byte(singleCSV), singleData)
 	if err != nil {
 		log.Fatalf("单条反序列化失败: %v", err)
@@ -71,7 +71,7 @@ func csvDeserializationDemo() {
 	invalidCSV := `symbol,unknown_field,price
 600000,test,10.50`
 
-	_, err = serializer.DeserializeMultiple([]byte(invalidCSV), subscriber.StockDataSchema)
+	_, err = serializer.DeserializeMultiple([]byte(invalidCSV), storage.StockDataSchema)
 	if err != nil {
 		fmt.Printf("预期错误: %v\n", err)
 	}
@@ -81,7 +81,7 @@ func csvDeserializationDemo() {
 	typeErrorCSV := `股票代码(symbol),当前价格(price)
 600000,invalid_price`
 
-	_, err = serializer.DeserializeMultiple([]byte(typeErrorCSV), subscriber.StockDataSchema)
+	_, err = serializer.DeserializeMultiple([]byte(typeErrorCSV), storage.StockDataSchema)
 	if err != nil {
 		fmt.Printf("预期错误: %v\n", err)
 	}
@@ -92,7 +92,7 @@ func csvDeserializationDemo() {
 	timeCSV := `股票代码(symbol),数据时间(timestamp)
 600000,2025-08-24 18:30:00`
 
-	timeDataList, err := serializer.DeserializeMultiple([]byte(timeCSV), subscriber.StockDataSchema)
+	timeDataList, err := serializer.DeserializeMultiple([]byte(timeCSV), storage.StockDataSchema)
 	if err != nil {
 		log.Fatalf("时间反序列化失败: %v", err)
 	}

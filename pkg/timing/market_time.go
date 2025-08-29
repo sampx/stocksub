@@ -127,10 +127,3 @@ func (m *MarketTime) IsAfterTradingEnd() bool {
 	// 收盘后时段: 15:00:11 之后（给1秒缓冲时间）
 	return currentTime >= "15:00:11"
 }
-
-// TimeUntilNextInterval 计算到下一个检查间隔的等待时间
-func (m *MarketTime) TimeUntilNextInterval(minutes int) time.Duration {
-	now := m.timeService.Now()
-	nextInterval := now.Add(time.Duration(minutes) * time.Minute)
-	return nextInterval.Sub(now)
-}

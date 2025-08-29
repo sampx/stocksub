@@ -9,9 +9,9 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"stocksub/pkg/subscriber"
-	"stocksub/pkg/testkit"
+	"stocksub/pkg/core"
 	"stocksub/pkg/testkit/config"
+	"stocksub/pkg/testkit/manager"
 	"strings"
 	"syscall"
 	"testing"
@@ -39,7 +39,7 @@ func TestSystem_TimeFieldConsistencyLongRun(t *testing.T) {
 		Cache:   config.CacheConfig{Type: "memory"},
 		Storage: config.StorageConfig{Type: "csv", Directory: t.TempDir()},
 	}
-	manager := testkit.NewTestDataManager(cfg)
+	manager := manager.NewTestDataManager(cfg)
 	defer manager.Close()
 
 	// 运行参数配置
@@ -255,7 +255,7 @@ func generateLongRunSummaryReport(t *testing.T, allAnalysis map[string][]TimeFie
 }
 
 // analyzeTimeFields 分析股票数据中的时间字段格式
-func analyzeTimeFields(stocksData []subscriber.StockData) map[string]TimeFieldAnalysis {
+func analyzeTimeFields(stocksData []core.StockData) map[string]TimeFieldAnalysis {
 	results := make(map[string]TimeFieldAnalysis)
 
 	for _, stock := range stocksData {

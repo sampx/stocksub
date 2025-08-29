@@ -6,14 +6,16 @@ import (
 	"sync"
 	"time"
 
+	"stocksub/pkg/core"
 	"stocksub/pkg/logger"
+	"stocksub/pkg/provider"
 
 	"github.com/sirupsen/logrus"
 )
 
 // DefaultSubscriber 默认订阅器实现
 type DefaultSubscriber struct {
-	provider      Provider
+	provider      provider.Provider
 	subscriptions map[string]*Subscription
 	subsMu        sync.RWMutex
 	eventChan     chan UpdateEvent
@@ -27,7 +29,7 @@ type DefaultSubscriber struct {
 }
 
 // NewSubscriber 创建新的订阅器
-func NewSubscriber(provider Provider) *DefaultSubscriber {
+func NewSubscriber(provider provider.Provider) *DefaultSubscriber {
 	return &DefaultSubscriber{
 		provider:      provider,
 		subscriptions: make(map[string]*Subscription),
@@ -176,7 +178,7 @@ func (s *DefaultSubscriber) GetSubscriptions() []Subscription {
 }
 
 // SetProvider 设置数据提供商
-func (s *DefaultSubscriber) SetProvider(provider Provider) {
+func (s *DefaultSubscriber) SetProvider(provider provider.Provider) {
 	s.provider = provider
 	s.log.Infof("Provider changed to: %s", provider.Name())
 }
@@ -355,7 +357,7 @@ func (s *DefaultSubscriber) fetchAndNotify(symbols []string) {
 	// 将切片数据转换为 map 结构，key 是股票代码，value 是股票数据
 	// 这样可以通过 O(1) 时间复杂度快速查找特定股票的数据
 	// 而不需要遍历整个切片（O(n) 复杂度）
-	dataMap := make(map[string]StockData)
+	dataMap := make(map[string]core.StockData)
 	for _, stock := range data {
 		// 使用股票代码作为 key 建立索引
 		dataMap[stock.Symbol] = stock
@@ -409,7 +411,7 @@ func (s *DefaultSubscriber) fetchAndNotify(symbols []string) {
 //     如需“必达”语义，应在上层增加更大的缓冲/专用事件处理器/或重试与丢弃统计。
 //  4. 时序说明：本方法通常在独立 goroutine 中调用（见 fetchAndNotify 中的 go s.notifyCallback），
 //     因此内部不得产生长时间阻塞操作（例如：同步写满通道）。
-func (s *DefaultSubscriber) notifyCallback(sub *Subscription, data StockData) {
+func (s *DefaultSubscriber) notifyCallback(sub *Subscription, data core.StockData) {
 	// 1) 保护区：确保回调产生的任何 panic 不会蔓延至系统其他部分
 	defer func() {
 		if r := recover(); r != nil {

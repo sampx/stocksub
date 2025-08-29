@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 	"runtime"
-	"stocksub/pkg/subscriber"
-	"stocksub/pkg/testkit"
-	"stocksub/pkg/testkit/cache"
-	"stocksub/pkg/testkit/config"
-
-	"stocksub/pkg/testkit/storage"
 	"testing"
 	"time"
+
+	"stocksub/pkg/cache"
+	"stocksub/pkg/core"
+	"stocksub/pkg/storage"
+	"stocksub/pkg/testkit/config"
+	"stocksub/pkg/testkit/manager"
 )
 
 // BenchmarkTestDataManager 基准测试TestDataManager的性能
@@ -20,15 +20,15 @@ func BenchmarkTestDataManager_GetStockData_VariousSizes(b *testing.B) {
 		Cache:   config.CacheConfig{Type: "memory"},
 		Storage: config.StorageConfig{Type: "csv", Directory: b.TempDir()},
 	}
-	manager := testkit.NewTestDataManager(cfg)
+	manager := manager.NewTestDataManager(cfg)
 	defer manager.Close()
 
 	// 启用Mock模式，避免真实API调用
 	manager.EnableMock(true)
 	allSymbols := []string{"600000", "000001", "688036", "835174", "300750"}
-	mockData := make([]subscriber.StockData, len(allSymbols))
+	mockData := make([]core.StockData, len(allSymbols))
 	for i, s := range allSymbols {
-		mockData[i] = subscriber.StockData{Symbol: s, Price: 100.0 + float64(i)}
+		mockData[i] = core.StockData{Symbol: s, Price: 100.0 + float64(i)}
 	}
 	manager.SetMockData(allSymbols, mockData)
 
@@ -91,7 +91,7 @@ func BenchmarkCSVStorage_WriteOperations_SingleAndBatch(b *testing.B) {
 	defer storage.Close()
 
 	b.Run("Save_Single", func(b *testing.B) {
-		testData := subscriber.StockData{Symbol: "BENCH001", Price: 123.45}
+		testData := core.StockData{Symbol: "BENCH001", Price: 123.45}
 		ctx := context.Background()
 
 		b.ResetTimer()
@@ -108,7 +108,7 @@ func BenchmarkCSVStorage_WriteOperations_SingleAndBatch(b *testing.B) {
 	b.Run("BatchSave_10_Items", func(b *testing.B) {
 		var batchData []interface{}
 		for i := 0; i < 10; i++ {
-			batchData = append(batchData, subscriber.StockData{Symbol: fmt.Sprintf("BATCH%03d", i), Price: 100.0 + float64(i)})
+			batchData = append(batchData, core.StockData{Symbol: fmt.Sprintf("BATCH%03d", i), Price: 100.0 + float64(i)})
 		}
 		ctx := context.Background()
 
@@ -134,15 +134,15 @@ func BenchmarkTestDataManager_GetStockData_MemoryUsage(b *testing.B) {
 			Cache:   config.CacheConfig{Type: "memory"},
 			Storage: config.StorageConfig{Type: "csv", Directory: b.TempDir()},
 		}
-		manager := testkit.NewTestDataManager(cfg)
+		manager := manager.NewTestDataManager(cfg)
 		defer manager.Close()
 
 		// 启用Mock模式，避免真实API调用
 		manager.EnableMock(true)
 		symbols := []string{"600000", "000001", "688036", "835174", "300750"}
-		mockData := make([]subscriber.StockData, len(symbols))
+		mockData := make([]core.StockData, len(symbols))
 		for i, s := range symbols {
-			mockData[i] = subscriber.StockData{Symbol: s, Price: 100.0 + float64(i)}
+			mockData[i] = core.StockData{Symbol: s, Price: 100.0 + float64(i)}
 		}
 		manager.SetMockData(symbols, mockData)
 		ctx := context.Background()
@@ -174,13 +174,13 @@ func BenchmarkManagerAndStorage_Concurrency_ReadAndWrite(b *testing.B) {
 			Cache:   config.CacheConfig{Type: "memory"},
 			Storage: config.StorageConfig{Type: "csv", Directory: b.TempDir()},
 		}
-		manager := testkit.NewTestDataManager(cfg)
+		manager := manager.NewTestDataManager(cfg)
 		defer manager.Close()
 
 		// 启用Mock模式，避免真实API调用
 		manager.EnableMock(true)
 		symbols := []string{"600000", "000001"}
-		mockData := []subscriber.StockData{
+		mockData := []core.StockData{
 			{Symbol: "600000", Price: 100.0},
 			{Symbol: "000001", Price: 200.0},
 		}
@@ -214,7 +214,7 @@ func BenchmarkManagerAndStorage_Concurrency_ReadAndWrite(b *testing.B) {
 		b.RunParallel(func(pb *testing.PB) {
 			counter := 0
 			for pb.Next() {
-				data := subscriber.StockData{Symbol: fmt.Sprintf("CONC%06d", counter), Price: 1.0}
+				data := core.StockData{Symbol: fmt.Sprintf("CONC%06d", counter), Price: 1.0}
 				counter++
 				if err := storage.Save(ctx, data); err != nil {
 					b.Fatalf("并发写入失败: %v", err)
@@ -239,7 +239,7 @@ func BenchmarkTestDataManager_GetStockData(b *testing.B) {
 		},
 	}
 
-	manager := testkit.NewTestDataManager(cfg)
+	manager := manager.NewTestDataManager(cfg)
 	defer manager.Close()
 
 	ctx := context.Background()
@@ -247,7 +247,7 @@ func BenchmarkTestDataManager_GetStockData(b *testing.B) {
 
 	// 启用Mock模式
 	manager.EnableMock(true)
-	mockData := []subscriber.StockData{
+	mockData := []core.StockData{
 		{Symbol: "BENCH001", Price: 100.00},
 		{Symbol: "BENCH002", Price: 200.00},
 	}

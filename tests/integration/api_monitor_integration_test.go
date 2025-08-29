@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"stocksub/pkg/provider/tencent"
-	"stocksub/pkg/testkit/storage"
+	"stocksub/pkg/storage"
 	"strings"
 	"testing"
 	"time"
@@ -130,7 +130,7 @@ type PerformanceMetric struct {
 // APIMonitorTest 测试版本的API监控器
 type APIMonitorTest struct {
 	config   MonitorConfig
-	provider *tencent.Provider
+	provider *tencent.Client
 	storage  *storage.CSVStorage // 使用新的 a
 	logger   *os.File
 	t        *testing.T
@@ -151,9 +151,9 @@ func NewTestAPIMonitor(config MonitorConfig, t *testing.T) (*APIMonitorTest, err
 		return nil, fmt.Errorf("创建日志文件失败: %v", err)
 	}
 
-	provider := tencent.NewProvider()
-	provider.SetTimeout(15 * time.Second)
-	provider.SetRateLimit(1 * time.Second)
+	provider := tencent.NewClient()
+	// provider.SetTimeout(15 * time.Second)
+	// provider.SetRateLimit(1 * time.Second)
 
 	// 使用新的 testkit storage
 	storageCfg := storage.DefaultCSVStorageConfig()
@@ -218,7 +218,7 @@ func (m *APIMonitorTest) Run() error {
 func (m *APIMonitorTest) collectData(ctx context.Context, successCount, errorCount *int, roundNum int) error {
 	queryTime := time.Now()
 
-	result, rawData, err := m.provider.FetchDataWithRaw(ctx, m.config.Symbols)
+	result, rawData, err := m.provider.FetchStockDataWithRaw(ctx, m.config.Symbols)
 	responseTime := time.Now()
 	requestDuration := responseTime.Sub(queryTime)
 

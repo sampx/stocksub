@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
-	"stocksub/pkg/subscriber"
-	"stocksub/pkg/testkit"
+	"stocksub/pkg/core"
 	"stocksub/pkg/testkit/config"
+	"stocksub/pkg/testkit/manager"
 )
 
 func main() {
@@ -36,7 +36,7 @@ func main() {
 			Directory: testDir,
 		},
 	}
-	manager := testkit.NewTestDataManager(cfg)
+	manager := manager.NewTestDataManager(cfg)
 	defer manager.Close()
 
 	// 示例2: 使用 Mock 功能
@@ -44,7 +44,7 @@ func main() {
 	manager.EnableMock(true)
 
 	symbols := []string{"MOCK001"}
-	mockData := []subscriber.StockData{
+	mockData := []core.StockData{
 		{
 			Symbol: "MOCK001",
 			Name:   "模拟股票",

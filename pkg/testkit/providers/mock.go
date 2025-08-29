@@ -8,17 +8,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	"stocksub/pkg/subscriber"
-	"stocksub/pkg/testkit/core"
+	"stocksub/pkg/core"
+	"stocksub/pkg/testkit"
 )
 
 // MockProvider 智能Mock Provider实现
 type MockProvider struct {
 	mu           sync.RWMutex
-	scenarios    map[string]*core.MockScenario
+	scenarios    map[string]*testkit.MockScenario
 	currentScene string
 	recorder     *CallRecorder
-	mockData     map[string][]subscriber.StockData
+	mockData     map[string][]core.StockData
 	enabled      bool
 	config       MockProviderConfig
 	stats        MockProviderStats
@@ -58,20 +58,20 @@ type CallRecorder struct {
 
 // CallRecord 调用记录
 type CallRecord struct {
-	ID        string                 `json:"id"`
-	Timestamp time.Time              `json:"timestamp"`
-	Symbols   []string               `json:"symbols"`
-	Response  []subscriber.StockData `json:"response"`
-	Error     error                  `json:"error"`
-	Duration  time.Duration          `json:"duration"`
-	Scenario  string                 `json:"scenario"`
+	ID        string           `json:"id"`
+	Timestamp time.Time        `json:"timestamp"`
+	Symbols   []string         `json:"symbols"`
+	Response  []core.StockData `json:"response"`
+	Error     error            `json:"error"`
+	Duration  time.Duration    `json:"duration"`
+	Scenario  string           `json:"scenario"`
 }
 
 // NewMockProvider 创建Mock Provider
 func NewMockProvider(config MockProviderConfig) *MockProvider {
 	mp := &MockProvider{
-		scenarios: make(map[string]*core.MockScenario),
-		mockData:  make(map[string][]subscriber.StockData),
+		scenarios: make(map[string]*testkit.MockScenario),
+		mockData:  make(map[string][]core.StockData),
 		enabled:   true,
 		config:    config,
 		stats:     MockProviderStats{},
@@ -114,7 +114,7 @@ func (mp *MockProvider) IsSymbolSupported(symbol string) bool {
 }
 
 // FetchData 获取股票数据
-func (mp *MockProvider) FetchData(ctx context.Context, symbols []string) ([]subscriber.StockData, error) {
+func (mp *MockProvider) FetchData(ctx context.Context, symbols []string) ([]core.StockData, error) {
 	startTime := time.Now()
 	atomic.AddInt64(&mp.stats.TotalCalls, 1)
 	mp.stats.LastCall = startTime
@@ -130,7 +130,7 @@ func (mp *MockProvider) FetchData(ctx context.Context, symbols []string) ([]subs
 	scenarios := mp.scenarios
 	mp.mu.RUnlock()
 
-	var result []subscriber.StockData
+	var result []core.StockData
 	var err error
 
 	// 优先检查SetMockData提供的数据
@@ -190,13 +190,13 @@ func (mp *MockProvider) SetMockMode(enabled bool) {
 }
 
 // SetMockData 设置Mock数据
-func (mp *MockProvider) SetMockData(symbols []string, data []subscriber.StockData) {
+func (mp *MockProvider) SetMockData(symbols []string, data []core.StockData) {
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
 
 	for i, symbol := range symbols {
 		if i < len(data) {
-			mp.mockData[symbol] = []subscriber.StockData{data[i]}
+			mp.mockData[symbol] = []core.StockData{data[i]}
 		}
 	}
 }
@@ -216,7 +216,7 @@ func (mp *MockProvider) SetScenario(scenarioName string) error {
 }
 
 // AddScenario 添加场景
-func (mp *MockProvider) AddScenario(scenario *core.MockScenario) {
+func (mp *MockProvider) AddScenario(scenario *testkit.MockScenario) {
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
 
@@ -235,11 +235,11 @@ func (mp *MockProvider) RemoveScenario(scenarioName string) {
 }
 
 // GetScenarios 获取所有场景
-func (mp *MockProvider) GetScenarios() map[string]*core.MockScenario {
+func (mp *MockProvider) GetScenarios() map[string]*testkit.MockScenario {
 	mp.mu.RLock()
 	defer mp.mu.RUnlock()
 
-	result := make(map[string]*core.MockScenario)
+	result := make(map[string]*testkit.MockScenario)
 	for name, scenario := range mp.scenarios {
 		result[name] = scenario
 	}
@@ -257,8 +257,8 @@ func (mp *MockProvider) Close() error {
 	}
 
 	mp.enabled = false
-	mp.scenarios = make(map[string]*core.MockScenario)
-	mp.mockData = make(map[string][]subscriber.StockData)
+	mp.scenarios = make(map[string]*testkit.MockScenario)
+	mp.mockData = make(map[string][]core.StockData)
 
 	return nil
 }
@@ -276,7 +276,7 @@ func (mp *MockProvider) GetStats() MockProviderStats {
 }
 
 // executeScenario 执行场景
-func (mp *MockProvider) executeScenario(symbols []string, scenario *core.MockScenario) ([]subscriber.StockData, error) {
+func (mp *MockProvider) executeScenario(symbols []string, scenario *testkit.MockScenario) ([]core.StockData, error) {
 	// 检查场景是否有通配符错误定义
 	if err, exists := scenario.Errors["*"]; exists && err != nil {
 		return nil, err
@@ -301,7 +301,7 @@ func (mp *MockProvider) executeScenario(symbols []string, scenario *core.MockSce
 	}
 
 	// 获取响应数据
-	result := make([]subscriber.StockData, 0, len(symbols))
+	result := make([]core.StockData, 0, len(symbols))
 	for _, symbol := range symbols {
 		if response, exists := scenario.Responses[symbol]; exists {
 			result = append(result, response.Data...)
@@ -320,16 +320,16 @@ func (mp *MockProvider) executeScenario(symbols []string, scenario *core.MockSce
 }
 
 // getMockData 获取Mock数据
-func (mp *MockProvider) getMockData(symbols []string) ([]subscriber.StockData, error) {
+func (mp *MockProvider) getMockData(symbols []string) ([]core.StockData, error) {
 	mp.mu.RLock()
 	defer mp.mu.RUnlock()
 
 	// 如果没有mock数据，直接返回空切片
 	if len(mp.mockData) == 0 {
-		return []subscriber.StockData{}, nil
+		return []core.StockData{}, nil
 	}
 
-	result := make([]subscriber.StockData, 0, len(symbols))
+	result := make([]core.StockData, 0, len(symbols))
 
 	for _, symbol := range symbols {
 		if data, exists := mp.mockData[symbol]; exists && len(data) > 0 {
@@ -343,7 +343,7 @@ func (mp *MockProvider) getMockData(symbols []string) ([]subscriber.StockData, e
 	}
 
 	// 如果mockData不完整，返回一个空切片，让上层逻辑继续处理
-	return []subscriber.StockData{}, nil
+	return []core.StockData{}, nil
 }
 
 // applyDelay 应用延迟
@@ -375,19 +375,19 @@ func (mp *MockProvider) updateAverageDelay(duration time.Duration) {
 // loadDefaultScenarios 加载默认场景
 func (mp *MockProvider) loadDefaultScenarios() {
 	// 正常场景
-	normalScenario := &core.MockScenario{
+	normalScenario := &testkit.MockScenario{
 		Name:        "normal",
 		Description: "正常数据返回场景",
-		Responses:   make(map[string]core.MockResponse),
+		Responses:   make(map[string]testkit.MockResponse),
 		Delays:      make(map[string]time.Duration),
 		Errors:      make(map[string]error),
 	}
 
 	// 错误场景
-	errorScenario := &core.MockScenario{
+	errorScenario := &testkit.MockScenario{
 		Name:        "error",
 		Description: "API错误场景",
-		Responses:   make(map[string]core.MockResponse),
+		Responses:   make(map[string]testkit.MockResponse),
 		Delays:      make(map[string]time.Duration),
 		Errors: map[string]error{
 			"*": fmt.Errorf("API服务暂时不可用"),
@@ -395,10 +395,10 @@ func (mp *MockProvider) loadDefaultScenarios() {
 	}
 
 	// 延迟场景
-	slowScenario := &core.MockScenario{
+	slowScenario := &testkit.MockScenario{
 		Name:        "slow",
 		Description: "高延迟场景",
-		Responses:   make(map[string]core.MockResponse),
+		Responses:   make(map[string]testkit.MockResponse),
 		Delays: map[string]time.Duration{
 			"*": 2 * time.Second,
 		},
@@ -529,8 +529,8 @@ func NewDataGenerator(config DataGenConfig) *DataGenerator {
 }
 
 // GenerateStockData 生成股票数据
-func (dg *DataGenerator) GenerateStockData(symbols []string) ([]subscriber.StockData, error) {
-	result := make([]subscriber.StockData, 0, len(symbols))
+func (dg *DataGenerator) GenerateStockData(symbols []string) ([]core.StockData, error) {
+	result := make([]core.StockData, 0, len(symbols))
 
 	for _, symbol := range symbols {
 		data := dg.generateSingleStock(symbol)
@@ -541,7 +541,7 @@ func (dg *DataGenerator) GenerateStockData(symbols []string) ([]subscriber.Stock
 }
 
 // generateSingleStock 生成单个股票数据
-func (dg *DataGenerator) generateSingleStock(symbol string) subscriber.StockData {
+func (dg *DataGenerator) generateSingleStock(symbol string) core.StockData {
 	// 生成基础价格
 	price := dg.generatePrice()
 	change := dg.generateChange()
@@ -550,7 +550,7 @@ func (dg *DataGenerator) generateSingleStock(symbol string) subscriber.StockData
 	// 生成其他字段
 	volume := dg.generateVolume()
 
-	return subscriber.StockData{
+	return core.StockData{
 		Symbol:        symbol,
 		Name:          dg.generateStockName(symbol),
 		Price:         price,

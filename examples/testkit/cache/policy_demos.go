@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"stocksub/pkg/testkit/cache"
+	"stocksub/pkg/cache"
 )
 
 // lruDemo 演示LRU缓存策略

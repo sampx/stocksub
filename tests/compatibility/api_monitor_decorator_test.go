@@ -13,8 +13,8 @@ func TestAPIMonitorDecoratorCompatibility(t *testing.T) {
 	t.Log("测试 API Monitor 在装饰器架构下的兼容性")
 
 	// 创建基础腾讯提供商
-	baseProvider := tencent.NewProvider()
-	baseProvider.SetTimeout(10 * time.Second)
+	baseProvider := tencent.NewClient()
+	// baseProvider.SetTimeout(10 * time.Second)
 
 	// 使用监控专用的装饰器配置
 	decoratorConfig := decorators.MonitoringDecoratorConfig()
@@ -59,8 +59,8 @@ func TestAPIMonitorDecoratorFunctionality(t *testing.T) {
 	t.Log("测试装饰器功能性")
 
 	// 创建装饰后的提供商
-	baseProvider := tencent.NewProvider()
-	baseProvider.SetTimeout(5 * time.Second)
+	baseProvider := tencent.NewClient()
+	// baseProvider.SetTimeout(5 * time.Second)
 
 	decoratorConfig := decorators.MonitoringDecoratorConfig()
 	decoratedProvider, err := decorators.CreateDecoratedProvider(baseProvider, decoratorConfig)
@@ -114,9 +114,9 @@ func TestAPIMonitorBackwardCompatibility(t *testing.T) {
 	t.Log("测试向后兼容性")
 
 	// 创建原始提供商（不使用装饰器）
-	originalProvider := tencent.NewProvider()
-	originalProvider.SetTimeout(5 * time.Second)
-	originalProvider.SetRateLimit(3 * time.Second)
+	originalProvider := tencent.NewClient()
+	// originalProvider.SetTimeout(5 * time.Second)
+	// originalProvider.SetRateLimit(3 * time.Second)
 
 	// 创建装饰后的提供商
 	decoratedProvider, err := decorators.CreateDecoratedProvider(originalProvider, decorators.MonitoringDecoratorConfig())
@@ -179,7 +179,7 @@ func TestAPIMonitorBackwardCompatibility(t *testing.T) {
 func TestAPIMonitorConfigurationFlexibility(t *testing.T) {
 	t.Log("测试配置灵活性")
 
-	baseProvider := tencent.NewProvider()
+	baseProvider := tencent.NewClient()
 
 	// 测试不同的配置场景
 	testCases := []struct {

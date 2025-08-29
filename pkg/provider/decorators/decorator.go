@@ -2,42 +2,42 @@ package decorators
 
 import (
 	"context"
-	"stocksub/pkg/provider/core"
-	"stocksub/pkg/subscriber"
+	"stocksub/pkg/core"
+	"stocksub/pkg/provider"
 	"time"
 )
 
 // Decorator 装饰器基础接口
 // 所有装饰器都应该实现此接口
 type Decorator interface {
-	core.Provider
+	provider.Provider
 
 	// GetBaseProvider 获取被装饰的基础 Provider
-	GetBaseProvider() core.Provider
+	GetBaseProvider() provider.Provider
 }
 
 // RealtimeStockDecorator 实时股票装饰器接口
 // 装饰 RealtimeStockProvider
 type RealtimeStockDecorator interface {
-	core.RealtimeStockProvider
+	provider.RealtimeStockProvider
 	Decorator
 }
 
 // RealtimeIndexDecorator 实时指数装饰器接口
 // 装饰 RealtimeIndexProvider
 type RealtimeIndexDecorator interface {
-	core.RealtimeIndexProvider
+	provider.RealtimeIndexProvider
 	Decorator
 }
 
 // BaseDecorator 装饰器基础实现
 // 提供通用的装饰器功能
 type BaseDecorator struct {
-	base core.Provider
+	base provider.Provider
 }
 
 // NewBaseDecorator 创建基础装饰器
-func NewBaseDecorator(base core.Provider) *BaseDecorator {
+func NewBaseDecorator(base provider.Provider) *BaseDecorator {
 	return &BaseDecorator{base: base}
 }
 
@@ -57,18 +57,18 @@ func (d *BaseDecorator) IsHealthy() bool {
 }
 
 // GetBaseProvider 实现 Decorator 接口
-func (d *BaseDecorator) GetBaseProvider() core.Provider {
+func (d *BaseDecorator) GetBaseProvider() provider.Provider {
 	return d.base
 }
 
 // RealtimeStockBaseDecorator 实时股票装饰器基础实现
 type RealtimeStockBaseDecorator struct {
 	*BaseDecorator
-	stockProvider core.RealtimeStockProvider
+	stockProvider provider.RealtimeStockProvider
 }
 
 // NewRealtimeStockBaseDecorator 创建实时股票基础装饰器
-func NewRealtimeStockBaseDecorator(stockProvider core.RealtimeStockProvider) *RealtimeStockBaseDecorator {
+func NewRealtimeStockBaseDecorator(stockProvider provider.RealtimeStockProvider) *RealtimeStockBaseDecorator {
 	return &RealtimeStockBaseDecorator{
 		BaseDecorator: NewBaseDecorator(stockProvider),
 		stockProvider: stockProvider,
@@ -76,12 +76,17 @@ func NewRealtimeStockBaseDecorator(stockProvider core.RealtimeStockProvider) *Re
 }
 
 // FetchStockData 实现 RealtimeStockProvider 接口
-func (d *RealtimeStockBaseDecorator) FetchStockData(ctx context.Context, symbols []string) ([]subscriber.StockData, error) {
+func (d *RealtimeStockBaseDecorator) FetchStockData(ctx context.Context, symbols []string) ([]core.StockData, error) {
+	return d.stockProvider.FetchStockData(ctx, symbols)
+}
+
+// FetchData 实现 Provider 接口
+func (d *RealtimeStockBaseDecorator) FetchData(ctx context.Context, symbols []string) ([]core.StockData, error) {
 	return d.stockProvider.FetchStockData(ctx, symbols)
 }
 
 // FetchStockDataWithRaw 实现 RealtimeStockProvider 接口
-func (d *RealtimeStockBaseDecorator) FetchStockDataWithRaw(ctx context.Context, symbols []string) ([]subscriber.StockData, string, error) {
+func (d *RealtimeStockBaseDecorator) FetchStockDataWithRaw(ctx context.Context, symbols []string) ([]core.StockData, string, error) {
 	return d.stockProvider.FetchStockDataWithRaw(ctx, symbols)
 }
 
@@ -93,24 +98,24 @@ func (d *RealtimeStockBaseDecorator) IsSymbolSupported(symbol string) bool {
 // DecoratorChain 装饰器链
 // 用于组合多个装饰器
 type DecoratorChain struct {
-	decorators []func(core.Provider) core.Provider
+	decorators []func(provider.Provider) provider.Provider
 }
 
 // NewDecoratorChain 创建装饰器链
 func NewDecoratorChain() *DecoratorChain {
 	return &DecoratorChain{
-		decorators: make([]func(core.Provider) core.Provider, 0),
+		decorators: make([]func(provider.Provider) provider.Provider, 0),
 	}
 }
 
 // AddDecorator 添加装饰器到链中
-func (dc *DecoratorChain) AddDecorator(decorator func(core.Provider) core.Provider) *DecoratorChain {
+func (dc *DecoratorChain) AddDecorator(decorator func(provider.Provider) provider.Provider) *DecoratorChain {
 	dc.decorators = append(dc.decorators, decorator)
 	return dc
 }
 
 // Apply 应用装饰器链到指定的 Provider
-func (dc *DecoratorChain) Apply(base core.Provider) core.Provider {
+func (dc *DecoratorChain) Apply(base provider.Provider) provider.Provider {
 	provider := base
 	for _, decorator := range dc.decorators {
 		provider = decorator(provider)
@@ -128,7 +133,7 @@ func NewDecoratorFactory() *DecoratorFactory {
 }
 
 // ApplyDefaultDecorators 应用默认装饰器配置
-func ApplyDefaultDecorators(provider core.RealtimeStockProvider) (core.RealtimeStockProvider, error) {
+func ApplyDefaultDecorators(provider provider.RealtimeStockProvider) (provider.RealtimeStockProvider, error) {
 	// 应用频率控制装饰器
 	frequencyProvider := NewFrequencyControlProvider(provider, &FrequencyControlConfig{
 		MinInterval: 200 * time.Millisecond,

@@ -4,15 +4,14 @@ package subscriber_test
 
 import (
 	"context"
-	"stocksub/pkg/subscriber"
-	"stocksub/pkg/testkit/core"
-	"stocksub/pkg/testkit/helpers"
-	"stocksub/pkg/testkit/storage"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"stocksub/pkg/core"
+	"stocksub/pkg/storage"
 )
 
 // TestSubscriber_StructuredData_CompatibilityWithStorage 验证新结构体与现有 pkg/testkit/storage 模块的完全兼容性
@@ -37,9 +36,9 @@ func testStructuredDataWithMemoryStorage(t *testing.T) {
 
 	ctx := context.Background()
 
-	var _ core.Storage = ms
+	var _ storage.Storage = ms
 
-	sd := subscriber.NewStructuredData(subscriber.StockDataSchema)
+	sd := storage.NewStructuredData(storage.StockDataSchema)
 	require.NoError(t, sd.SetField("symbol", "600000"))
 	require.NoError(t, sd.SetField("name", "浦发银行"))
 	require.NoError(t, sd.SetField("price", 10.50))
@@ -53,7 +52,7 @@ func testStructuredDataWithMemoryStorage(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 
-	loadedSD, ok := results[0].(*subscriber.StructuredData)
+	loadedSD, ok := results[0].(*storage.StructuredData)
 	require.True(t, ok, "返回的数据应该是 *subscriber.StructuredData 类型")
 
 	symbol, err := loadedSD.GetField("symbol")
@@ -66,17 +65,17 @@ func testStructuredDataWithCSVStorage(t *testing.T) {
 	config := storage.CSVStorageConfig{
 		Directory:      tempDir,
 		FilePrefix:     "compat_test",
-		ResourceConfig: helpers.DefaultResourceConfig(),
+		ResourceConfig: storage.DefaultResourceConfig(),
 	}
 	csvStorage, err := storage.NewCSVStorage(config)
 	require.NoError(t, err)
 	defer csvStorage.Close()
 
-	var _ core.Storage = csvStorage
+	var _ storage.Storage = csvStorage
 
 	ctx := context.Background()
 
-	sd := subscriber.NewStructuredData(subscriber.StockDataSchema)
+	sd := storage.NewStructuredData(storage.StockDataSchema)
 	require.NoError(t, sd.SetField("symbol", "600000"))
 	require.NoError(t, sd.SetField("name", "浦发银行"))
 	require.NoError(t, sd.SetField("price", 10.50))
@@ -103,7 +102,7 @@ func testStructuredDataWithBatchWriter(t *testing.T) {
 
 	ctx := context.Background()
 
-	sd := subscriber.NewStructuredData(subscriber.StockDataSchema)
+	sd := storage.NewStructuredData(storage.StockDataSchema)
 	require.NoError(t, sd.SetField("symbol", "600000"))
 	require.NoError(t, sd.SetField("name", "浦发银行"))
 	require.NoError(t, sd.SetField("price", 10.50))

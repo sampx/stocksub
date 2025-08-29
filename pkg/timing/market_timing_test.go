@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // MockTimeService 模拟时间服务
@@ -17,7 +16,7 @@ func (m *MockTimeService) Now() time.Time {
 	return m.current
 }
 
-func TestMarketTimingEdgeCases(t *testing.T) {
+func TestMarketTiming_TradingTime_AllCases(t *testing.T) {
 	// 测试边界条件：准确的时间窗口检测
 	tests := []struct {
 		name     string
@@ -61,24 +60,24 @@ func TestMarketTimingEdgeCases(t *testing.T) {
 	}
 }
 
-func TestIsTradingDay(t *testing.T) {
+func TestMarketTiming_TradingDay(t *testing.T) {
 	tests := []struct {
 		name     string
 		mockTime string
 		expected bool
 	}{
-		{"周一-交易日", "2025-08-25 10:00:00", true},
-		{"周二-交易日", "2025-08-26 10:00:00", true},
-		{"周三-交易日", "2025-08-27 10:00:00", true},
-		{"周四-交易日", "2025-08-28 10:00:00", true},
-		{"周五-交易日", "2025-08-29 10:00:00", true},
-		{"周六-休市", "2025-08-23 10:00:00", false},
-		{"周日-休市", "2025-08-24 10:00:00", false},
+		{"周一-交易日", "2025-08-25", true},
+		{"周二-交易日", "2025-08-26", true},
+		{"周三-交易日", "2025-08-27", true},
+		{"周四-交易日", "2025-08-28", true},
+		{"周五-交易日", "2025-08-29", true},
+		{"周六-休市", "2025-08-23", false},
+		{"周日-休市", "2025-08-24", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockTime, _ := time.Parse("2006-01-02 15:04:05", tt.mockTime)
+			mockTime, _ := time.Parse("2006-01-02", tt.mockTime)
 			mockService := &MockTimeService{current: mockTime}
 
 			mt := NewMarketTime(mockService)
@@ -89,20 +88,20 @@ func TestIsTradingDay(t *testing.T) {
 	}
 }
 
-func TestIsAfterTradingEnd(t *testing.T) {
+func TestMarketTiming_AfterTradingEnd(t *testing.T) {
 	tests := []struct {
 		name     string
 		mockTime string
 		expected bool
 	}{
-		{"收盘后1秒-应检查", "2025-08-21 15:00:11", true},
-		{"收盘后1分钟-应检查", "2025-08-21 15:01:00", true},
-		{"收盘后2小时-应检查", "2025-08-21 17:00:00", true},
-		{"收盘当时-不检查", "2025-08-21 15:00:10", false},
-		{"收盘前-不检查", "2025-08-21 14:59:59", false},
-		{"下午正常-不检查", "2025-08-21 14:30:00", false},
-		{"上午时段-不检查", "2025-08-21 10:30:00", false},
-		{"周末-不检查", "2025-08-23 16:00:00", false},
+		{"收盘后1秒", "2025-08-21 15:00:11", true},
+		{"收盘后1分钟", "2025-08-21 15:01:00", true},
+		{"收盘后2小时", "2025-08-21 17:00:00", true},
+		{"收盘当时", "2025-08-21 15:00:10", false},
+		{"下午盘", "2025-08-21 14:59:59", false},
+		{"下午正常", "2025-08-21 14:30:00", false},
+		{"早盘正常", "2025-08-21 10:30:00", false},
+		{"周末", "2025-08-23 16:00:00", false},
 	}
 
 	for _, tt := range tests {
@@ -118,19 +117,22 @@ func TestIsAfterTradingEnd(t *testing.T) {
 	}
 }
 
-func TestIsCloseToEnd(t *testing.T) {
+// 是否收盘临近5分钟
+func TestMarketTiming_IsCloseToEnd(t *testing.T) {
 	tests := []struct {
 		name     string
 		mockTime string
 		expected bool
 	}{
-		{"收盘前5分钟-允许", "2025-08-21 14:55:00", true},
-		{"收盘前3分钟-允许", "2025-08-21 14:57:00", true},
-		{"收盘前1分钟-允许", "2025-08-21 14:59:00", true},
-		{"收盘前0分钟-允许", "2025-08-21 15:00:00", true},
-		{"收盘后禁止", "2025-08-21 15:00:11", false},
-		{"下午正常时段-禁止", "2025-08-21 14:30:00", false},
-		{"未知时间点-允许", "2025-08-21 14:58:00", true},
+		{"收盘前5分钟-不是", "2025-08-21 14:50:00", false},
+		{"收盘前5分钟-是", "2025-08-21 14:55:00", true},
+		{"收盘前3分钟-是", "2025-08-21 14:57:00", true},
+		{"收盘前1分钟-是", "2025-08-21 14:59:00", true},
+		{"刚刚收盘-是", "2025-08-21 15:00:00", true},
+		{"收盘后5秒内-是", "2025-08-21 15:00:05", true},
+		{"收盘后10秒-是", "2025-08-21 15:00:10", true},
+		{"收盘后11秒-不是", "2025-08-21 15:00:11", false},
+		{"下午正常时段-不是", "2025-08-21 14:30:00", false},
 	}
 
 	for _, tt := range tests {
@@ -146,7 +148,8 @@ func TestIsCloseToEnd(t *testing.T) {
 	}
 }
 
-func TestGetNextTradingDayStart(t *testing.T) {
+// 距离当前时间最近的交易日开盘时间
+func TestMarketTiming_GetNextTradingDayStart(t *testing.T) {
 	location := time.FixedZone("CST", 8*3600) // 中国时区
 
 	tests := []struct {
@@ -159,6 +162,10 @@ func TestGetNextTradingDayStart(t *testing.T) {
 		{"周五下午16点", "2025-08-22 16:00:00", "2025-08-25 09:13:30"}, // 下周一
 		{"周六上午", "2025-08-23 10:00:00", "2025-08-25 09:13:30"},    // 下周一
 		{"周日上午", "2025-08-24 10:00:00", "2025-08-25 09:13:30"},    // 下周一
+		{"月末", "2025-08-29 16:00:00", "2025-09-01 09:13:30"},      // 8月29日是周五，过了交易时间，下一个交易日是下周一(9月1日)
+		{"月初", "2025-09-01 09:00:00", "2025-09-01 09:13:30"},
+		{"年末", "2025-12-31 16:00:00", "2026-01-01 09:13:30"}, // 下一年
+		{"年初", "2026-01-01 09:00:00", "2026-01-01 09:13:30"},
 	}
 
 	for _, tt := range tests {
@@ -177,148 +184,34 @@ func TestGetNextTradingDayStart(t *testing.T) {
 	}
 }
 
-func TestGetTradingEndTime(t *testing.T) {
+// 当天交易结束时间
+func TestMarketTiming_GetTradingEndTime(t *testing.T) {
 	location := time.FixedZone("CST", 8*3600) // 中国时区
-	mockTime, _ := time.ParseInLocation("2006-01-02 15:04:05", "2025-08-21 10:00:00", location)
-	expectedEnd, _ := time.ParseInLocation("2006-01-02 15:04:05", "2025-08-21 15:00:10", location)
 
-	mockService := &MockTimeService{current: mockTime}
-	mt := NewMarketTime(mockService)
-
-	actualEnd := mt.GetTradingEndTime()
-
-	assert.WithinDuration(t, expectedEnd, actualEnd, time.Second, "交易结束时间应匹配预期")
-}
-
-func TestDefaultMarketTime(t *testing.T) {
-	mt := DefaultMarketTime()
-	require.NotNil(t, mt, "DefaultMarketTime应返回非空实例")
-	assert.NotNil(t, mt, "系统时间服务应正确初始化")
-
-	// 由于测试环境差异，这里只需验证调用不会panic
-	result := mt.IsTradingTime()
-	assert.IsType(t, true, result, "IsTradingTime应返回布尔值")
-}
-
-// MarketTimeTestHelper 市场时间测试辅助结构
-type MarketTimeTestHelper struct {
-	TimeService *MockTimeService
-	MarketTime  *MarketTime
-}
-
-// NewMarketTimeTestHelper 创建新的测试辅助器
-func NewMarketTimeTestHelper(initialTime time.Time) *MarketTimeTestHelper {
-	mockService := &MockTimeService{current: initialTime}
-	marketTime := NewMarketTime(mockService)
-
-	return &MarketTimeTestHelper{
-		TimeService: mockService,
-		MarketTime:  marketTime,
-	}
-}
-
-// AdvanceMarketTime 推进市场时间到指定时间点
-func (h *MarketTimeTestHelper) AdvanceMarketTime(newTime time.Time) {
-	h.TimeService.current = newTime
-}
-
-// IsInTradingWindow 当前是否在现易时间窗口内（近似检查）
-func (h *MarketTimeTestHelper) IsInTradingWindow() bool {
-	return h.MarketTime.IsTradingTime()
-}
-
-// TestMarketTimeScenarios 标准的市场时间测试场景套件
-func TestMarketTimeScenarios(t *testing.T) {
-	location := time.FixedZone("CST", 8*3600)
-
-	testScenarios := []struct {
-		description    string
-		testTime       string
-		expectedResult bool
+	tests := []struct {
+		name         string
+		mockTime     string
+		expectedTime string
 	}{
-		{
-			description:    "开盘前30秒 - 应该禁止",
-			testTime:       "2025-08-21 09:13:00",
-			expectedResult: false,
-		},
-		{
-			description:    "开盘后30秒 - 应该允许",
-			testTime:       "2025-08-21 09:14:00",
-			expectedResult: true,
-		},
-		{
-			description:    "上午收盘前30秒 - 应该允许",
-			testTime:       "2025-08-21 11:29:30",
-			expectedResult: true,
-		},
-		{
-			description:    "午休时间 - 应该禁止",
-			testTime:       "2025-08-21 11:35:00",
-			expectedResult: false,
-		},
-		{
-			description:    "下午开盘后30秒 - 应该允许",
-			testTime:       "2025-08-21 12:58:00",
-			expectedResult: true,
-		},
-		{
-			description:    "收盘前30分钟 - 应该允许",
-			testTime:       "2025-08-21 14:30:30",
-			expectedResult: true,
-		},
-		{
-			description:    "收盘后30秒 - 应该禁止",
-			testTime:       "2025-08-21 15:00:30",
-			expectedResult: false,
-		},
-		{
-			description:    "周末 - 应该禁止",
-			testTime:       "2025-08-23 10:00:00", // Saturday
-			expectedResult: false,
-		},
+		{"上午10点", "2025-08-21 10:00:00", "2025-08-21 15:00:10"},
+		{"下午2点", "2025-08-21 14:00:00", "2025-08-21 15:00:10"},
+		{"下午3点", "2025-08-21 15:00:00", "2025-08-21 15:00:10"},
+		{"不同日期", "2025-08-22 09:00:00", "2025-08-22 15:00:10"},
+		{"月初", "2025-08-01 10:00:00", "2025-08-01 15:00:10"},
+		{"年末", "2025-12-31 10:00:00", "2025-12-31 15:00:10"},
 	}
 
-	for _, scenario := range testScenarios {
-		t.Run(scenario.description, func(t *testing.T) {
-			testTime, _ := time.ParseInLocation("2006-01-02 15:04:05", scenario.testTime, location)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockTime, _ := time.ParseInLocation("2006-01-02 15:04:05", tt.mockTime, location)
+			expectedEnd, _ := time.ParseInLocation("2006-01-02 15:04:05", tt.expectedTime, location)
 
-			helper := NewMarketTimeTestHelper(testTime)
-			result := helper.IsInTradingWindow()
+			mockService := &MockTimeService{current: mockTime}
+			mt := NewMarketTime(mockService)
 
-			assert.Equal(t, scenario.expectedResult, result, scenario.description)
-		})
-	}
-}
+			actualEnd := mt.GetTradingEndTime()
 
-// SimulateFullTradingDay 模拟完整的交易日程
-func SimulateFullTradingDay(t *testing.T) {
-	location := time.FixedZone("CST", 8*3600)
-	_ = time.Date(2025, 8, 21, 8, 30, 0, 0, location) // 上午8:30开始
-
-	timeline := []struct {
-		timeString      string
-		description     string
-		shouldBeTrading bool
-	}{
-		{"08:30:00", "开盘前准备 - 市场尚未开始", false},
-		{"09:13:30", "正式开始监控 - 市场开盘", true},
-		{"10:15:45", "正常交易时段 - 应该运行", true},
-		{"11:29:50", "上午收盘阶段 - 应该继续", true},
-		{"11:30:11", "午休时间 - 应该暂停", false},
-		{"12:57:30", "下午重启交易 - 重新开启", true},
-		{"14:55:00", "收盘前稳定数据检查期", true},
-		{"15:00:10", "交易结束 - 停止API调用", false},
-		{"15:01:00", "盘后清理期 - 完全停止", false},
-	}
-
-	for _, event := range timeline {
-		t.Run(event.description, func(t *testing.T) {
-			testTime, _ := time.ParseInLocation("2006-01-02 15:04:05", "2025-08-21 "+event.timeString, location)
-
-			helper := NewMarketTimeTestHelper(testTime)
-			trading := helper.IsInTradingWindow()
-
-			assert.Equal(t, event.shouldBeTrading, trading, event.description)
+			assert.WithinDuration(t, expectedEnd, actualEnd, time.Second, "交易结束时间应匹配预期")
 		})
 	}
 }

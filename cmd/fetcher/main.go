@@ -71,7 +71,7 @@ func main() {
 
 	// 注册腾讯提供商
 	log.Debug("创建腾讯数据提供商")
-	tencentProvider := tencent.NewProvider()
+	tencentProvider := tencent.NewClient()
 
 	// 应用装饰器
 	decoratedProvider, err := decorators.ApplyDefaultDecorators(tencentProvider)
@@ -90,7 +90,7 @@ func main() {
 
 	// 注册新浪提供商
 	log.Debug("创建新浪数据提供商")
-	sinaProvider := sina.NewProvider()
+	sinaProvider := sina.NewClient()
 	decoratedSinaProvider, err := decorators.ApplyDefaultDecorators(sinaProvider)
 	if err != nil {
 		log.Warnf("应用新浪提供商装饰器失败: %v，使用原始提供商", err)

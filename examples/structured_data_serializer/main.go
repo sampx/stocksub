@@ -5,14 +5,15 @@ import (
 	"log"
 	"time"
 
-	"stocksub/pkg/subscriber"
+	"stocksub/pkg/core"
+	"stocksub/pkg/storage"
 )
 
 func main() {
 	fmt.Println("=== StructuredDataSerializer 示例 ===")
 
 	// 1. 创建结构化数据
-	sd := subscriber.NewStructuredData(subscriber.StockDataSchema)
+	sd := storage.NewStructuredData(storage.StockDataSchema)
 
 	// 设置字段值
 	sd.SetField("symbol", "600000")
@@ -31,7 +32,7 @@ func main() {
 	fmt.Println()
 
 	// 2. CSV 序列化
-	csvSerializer := subscriber.NewStructuredDataSerializer(subscriber.FormatCSV)
+	csvSerializer := storage.NewStructuredDataSerializer(storage.FormatCSV)
 
 	csvData, err := csvSerializer.Serialize(sd)
 	if err != nil {
@@ -43,7 +44,7 @@ func main() {
 	fmt.Printf("   CSV内容:\n%s\n", string(csvData))
 
 	// 3. JSON 序列化
-	jsonSerializer := subscriber.NewStructuredDataSerializer(subscriber.FormatJSON)
+	jsonSerializer := storage.NewStructuredDataSerializer(storage.FormatJSON)
 
 	jsonData, err := jsonSerializer.Serialize(sd)
 	if err != nil {
@@ -55,7 +56,7 @@ func main() {
 	fmt.Printf("   JSON内容:\n%s\n", string(jsonData))
 
 	// 4. CSV 反序列化
-	deserializedSD := subscriber.NewStructuredData(subscriber.StockDataSchema)
+	deserializedSD := storage.NewStructuredData(storage.StockDataSchema)
 	err = csvSerializer.Deserialize(csvData, deserializedSD)
 	if err != nil {
 		log.Fatalf("CSV反序列化失败: %v", err)
@@ -74,7 +75,7 @@ func main() {
 	fmt.Println("5. 批量序列化示例:")
 
 	// 创建第二个数据
-	sd2 := subscriber.NewStructuredData(subscriber.StockDataSchema)
+	sd2 := storage.NewStructuredData(storage.StockDataSchema)
 	sd2.SetField("symbol", "000001")
 	sd2.SetField("name", "平安银行")
 	sd2.SetField("price", 12.80)
@@ -84,7 +85,7 @@ func main() {
 	sd2.SetField("timestamp", time.Now())
 
 	// 批量序列化
-	dataList := []*subscriber.StructuredData{sd, sd2}
+	dataList := []*storage.StructuredData{sd, sd2}
 	batchCSVData, err := csvSerializer.SerializeMultiple(dataList)
 	if err != nil {
 		log.Fatalf("批量CSV序列化失败: %v", err)
@@ -95,7 +96,7 @@ func main() {
 	// 6. 从 StockData 转换示例
 	fmt.Println("6. 从 StockData 转换示例:")
 
-	stockData := subscriber.StockData{
+	stockData := core.StockData{
 		Symbol:        "601398",
 		Name:          "工商银行",
 		Price:         5.25,
@@ -105,7 +106,7 @@ func main() {
 		Timestamp:     time.Now(),
 	}
 
-	convertedSD, err := subscriber.StockDataToStructuredData(stockData)
+	convertedSD, err := storage.StockDataToStructuredData(stockData)
 	if err != nil {
 		log.Fatalf("StockData转换失败: %v", err)
 	}
