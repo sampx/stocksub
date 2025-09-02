@@ -68,7 +68,7 @@ func (p *ConfigurableStockProvider) GetRateLimit() time.Duration {
 
 func (p *ConfigurableStockProvider) FetchStockData(ctx context.Context, symbols []string) ([]core.StockData, error) {
 	result := make([]core.StockData, 0, len(symbols))
-	
+
 	for _, symbol := range symbols {
 		if stock, exists := p.stocks[symbol]; exists {
 			// 更新时间戳
@@ -76,7 +76,7 @@ func (p *ConfigurableStockProvider) FetchStockData(ctx context.Context, symbols 
 			result = append(result, stock)
 		}
 	}
-	
+
 	return result, nil
 }
 
@@ -102,7 +102,7 @@ func main() {
 
 	// 示例1：使用代码定义的配置
 	fmt.Println("\n=== 代码定义配置 ===")
-	
+
 	// 创建默认配置
 	defaultConfig := decorators.DefaultDecoratorConfig()
 	fmt.Println("默认配置:")
@@ -120,7 +120,7 @@ func main() {
 
 	// 示例2：生产环境配置
 	fmt.Println("\n=== 生产环境配置 ===")
-	
+
 	productionConfig := decorators.ProductionDecoratorConfig()
 	fmt.Println("生产环境配置:")
 	printDecoratorConfig(productionConfig)
@@ -136,7 +136,7 @@ func main() {
 
 	// 示例3：测试环境配置（所有装饰器被禁用）
 	fmt.Println("\n=== 测试环境配置 ===")
-	
+
 	testConfig := decorators.TestDecoratorConfig()
 	fmt.Println("测试环境配置:")
 	printDecoratorConfig(testConfig)
@@ -152,7 +152,7 @@ func main() {
 
 	// 示例4：监控环境配置
 	fmt.Println("\n=== 监控环境配置 ===")
-	
+
 	monitoringConfig := decorators.MonitoringDecoratorConfig()
 	fmt.Println("监控环境配置:")
 	printDecoratorConfig(monitoringConfig)
@@ -168,7 +168,7 @@ func main() {
 
 	// 示例5：自定义配置
 	fmt.Println("\n=== 自定义配置 ===")
-	
+
 	customConfig := provider.ProviderDecoratorConfig{
 		All: []provider.DecoratorConfig{
 			{
@@ -215,7 +215,7 @@ func main() {
 
 	// 示例6：使用 Viper 从文件加载配置（模拟）
 	fmt.Println("\n=== 从配置文件加载 (模拟) ===")
-	
+
 	// 创建模拟的配置文件内容
 	yamlConfig := `
 decorator:
@@ -260,10 +260,10 @@ decorator:
 
 	// 示例7：动态配置调整演示
 	fmt.Println("\n=== 动态配置调整演示 ===")
-	
+
 	// 创建可配置装饰器链
 	chain := decorators.NewConfigurableDecoratorChain()
-	
+
 	// 动态添加装饰器配置
 	fmt.Println("动态添加频率控制装饰器...")
 	chain.AddDecorator(provider.DecoratorConfig{
@@ -302,15 +302,15 @@ decorator:
 	}
 
 	fmt.Printf("动态配置装饰器: %s\n", dynamicDecorated.Name())
-	
+
 	// 显示将要应用的装饰器类型
 	decoratorTypes := chain.GetAppliedDecorators(baseProvider)
 	fmt.Printf("应用的装饰器类型: %v\n", decoratorTypes)
-	
+
 	testProvider(dynamicDecorated, "动态配置")
 
 	fmt.Println("\n装饰器配置示例完成！")
-	
+
 	fmt.Println("\n=== 总结 ===")
 	fmt.Println("1. 默认配置：适合快速开发和原型")
 	fmt.Println("2. 生产环境配置：更严格的限制和更长的超时")
@@ -325,25 +325,25 @@ decorator:
 func printDecoratorConfig(config provider.ProviderDecoratorConfig) {
 	fmt.Printf("  全局装饰器: %d个\n", len(config.All))
 	for i, decorator := range config.All {
-		fmt.Printf("    %d. %s (启用: %v, 优先级: %d)\n", 
+		fmt.Printf("    %d. %s (启用: %v, 优先级: %d)\n",
 			i+1, decorator.Type, decorator.Enabled, decorator.Priority)
 	}
 
 	fmt.Printf("  实时装饰器: %d个\n", len(config.Realtime))
 	for i, decorator := range config.Realtime {
-		fmt.Printf("    %d. %s (启用: %v, 优先级: %d)\n", 
+		fmt.Printf("    %d. %s (启用: %v, 优先级: %d)\n",
 			i+1, decorator.Type, decorator.Enabled, decorator.Priority)
 	}
 
 	fmt.Printf("  历史装饰器: %d个\n", len(config.Historical))
 	for i, decorator := range config.Historical {
-		fmt.Printf("    %d. %s (启用: %v, 优先级: %d)\n", 
+		fmt.Printf("    %d. %s (启用: %v, 优先级: %d)\n",
 			i+1, decorator.Type, decorator.Enabled, decorator.Priority)
 	}
 
 	fmt.Printf("  指数装饰器: %d个\n", len(config.Index))
 	for i, decorator := range config.Index {
-		fmt.Printf("    %d. %s (启用: %v, 优先级: %d)\n", 
+		fmt.Printf("    %d. %s (启用: %v, 优先级: %d)\n",
 			i+1, decorator.Type, decorator.Enabled, decorator.Priority)
 	}
 }
@@ -355,7 +355,7 @@ func testProvider(decoratedProvider provider.Provider, configName string) {
 		ctx := context.Background()
 
 		fmt.Printf("测试 %s:\n", configName)
-		
+
 		start := time.Now()
 		data, err := realtimeProvider.FetchStockData(ctx, symbols)
 		elapsed := time.Since(start)

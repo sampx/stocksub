@@ -141,8 +141,10 @@ func (d *BaseDecorator) GetBaseProvider() Provider {
 type DecoratorType string
 
 const (
-	FrequencyControlType DecoratorType = "frequency_control"
-	CircuitBreakerType   DecoratorType = "circuit_breaker"
+	FrequencyControlType           DecoratorType = "frequency_control"
+	CircuitBreakerType             DecoratorType = "circuit_breaker"
+	SimplifiedFrequencyControlType DecoratorType = "simplified_frequency_control"
+	SimplifiedCircuitBreakerType   DecoratorType = "simplified_circuit_breaker"
 )
 
 // DecoratorConfig 装饰器配置

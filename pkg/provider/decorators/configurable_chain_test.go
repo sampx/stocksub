@@ -3,13 +3,63 @@ package decorators
 import (
 	"context"
 	"stocksub/pkg/core"
+	"stocksub/pkg/limiter"
 	"stocksub/pkg/provider"
+	"stocksub/pkg/testkit/providers"
+	"stocksub/pkg/timing"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// MockTimeService 模拟时间服务
+type MockTimeService struct {
+	current time.Time
+}
+
+func (m *MockTimeService) Now() time.Time {
+	return m.current
+}
+
+func (m *MockTimeService) SetCurrentTime(t time.Time) {
+	m.current = t
+}
+
+// MockProviderAdapter 适配器，将MockProvider适配为RealtimeStockProvider
+type MockProviderAdapter struct {
+	*providers.MockProvider
+	fetchError error
+}
+
+func NewMockProviderAdapter(config providers.MockProviderConfig) *MockProviderAdapter {
+	return &MockProviderAdapter{
+		MockProvider: providers.NewMockProvider(config),
+	}
+}
+
+func (m *MockProviderAdapter) FetchStockData(ctx context.Context, symbols []string) ([]core.StockData, error) {
+	if m.fetchError != nil {
+		return nil, m.fetchError
+	}
+	return m.MockProvider.FetchData(ctx, symbols)
+}
+
+func (m *MockProviderAdapter) FetchStockDataWithRaw(ctx context.Context, symbols []string) ([]core.StockData, string, error) {
+	if m.fetchError != nil {
+		return nil, "", m.fetchError
+	}
+	data, err := m.MockProvider.FetchData(ctx, symbols)
+	if err != nil {
+		return nil, "", err
+	}
+	return data, "raw_string", nil
+}
+
+func (m *MockProviderAdapter) SetFetchDataError(err error) {
+	m.fetchError = err
+}
 
 // MockRealtimeProvider 是一个用于测试的模拟实时提供商
 type MockRealtimeProvider struct{}
@@ -140,6 +190,16 @@ func TestConfigurableDecoratorChain(t *testing.T) {
 
 		decorated, err := CreateDecoratedProvider(realtimeProvider, config)
 		require.NoError(t, err)
+
+		// 模拟交易时间
+		if fcProvider, ok := decorated.(*CircuitBreakerProvider).GetBaseProvider().(*FrequencyControlProvider); ok {
+			mockTime := &MockTimeService{}
+			tradingTime := time.Date(2023, 1, 2, 10, 0, 0, 0, time.Local) // Monday 10:00 AM
+			mockTime.SetCurrentTime(tradingTime)
+			marketTime := timing.NewMarketTime(mockTime)
+			fcProvider.marketTime = marketTime
+			fcProvider.limiter = limiter.NewIntelligentLimiter(marketTime)
+		}
 
 		// 测试实际的数据获取功能
 		ctx := context.Background()
