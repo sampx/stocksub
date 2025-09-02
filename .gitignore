@@ -14,8 +14,9 @@ tests/data/
 .kiro/
 .spec-workflow/
 .kilocode/
-.kilocode/rules/
+.roo/
 .clinerules/
 CLAUDE.md
 QWEN.md
 .continue/rules/
+AGENTS.md
