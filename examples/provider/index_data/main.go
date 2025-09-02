@@ -261,7 +261,7 @@ func main() {
 
 		if i < 2 { // 最后一次不需要等待
 			time.Sleep(3 * time.Second)
-		} 
+		}
 	}
 
 	// 7. 演示错误处理

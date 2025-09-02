@@ -110,6 +110,10 @@ func CreateDecorator(decoratorType provider.DecoratorType, p provider.Provider, 
 		return createFrequencyControlProvider(p, config)
 	case provider.CircuitBreakerType:
 		return createCircuitBreakerProvider(p, config)
+	case provider.SimplifiedFrequencyControlType:
+		return createSimplifiedFrequencyControlProvider(p, config)
+	case provider.SimplifiedCircuitBreakerType:
+		return createSimplifiedCircuitBreakerProvider(p, config)
 	default:
 		return nil, fmt.Errorf("不支持的装饰器类型: %s", decoratorType)
 	}
@@ -342,5 +346,94 @@ func MonitoringDecoratorConfig() provider.ProviderDecoratorConfig {
 				},
 			},
 		},
+	}
+}
+
+// createSimplifiedFrequencyControlProvider 创建简化频率控制装饰器
+func createSimplifiedFrequencyControlProvider(prov provider.Provider, configMap map[string]interface{}) (provider.Provider, error) {
+	config := DefaultSimplifiedFrequencyControlConfig()
+
+	// 解析配置
+	if configMap != nil {
+		if minInterval, ok := configMap["min_interval"].(string); ok {
+			if duration, err := time.ParseDuration(minInterval); err == nil {
+				config.MinInterval = duration
+			}
+		}
+		if maxRetries, ok := configMap["max_retries"].(int); ok {
+			config.MaxRetries = maxRetries
+		}
+		if enabled, ok := configMap["enabled"].(bool); ok {
+			config.Enabled = enabled
+		}
+		if marketTimeAware, ok := configMap["market_time_aware"].(bool); ok {
+			config.MarketTimeAware = marketTimeAware
+		}
+		if preMarketBuffer, ok := configMap["pre_market_buffer"].(string); ok {
+			if duration, err := time.ParseDuration(preMarketBuffer); err == nil {
+				config.PreMarketBuffer = duration
+			}
+		}
+		if postMarketBuffer, ok := configMap["post_market_buffer"].(string); ok {
+			if duration, err := time.ParseDuration(postMarketBuffer); err == nil {
+				config.PostMarketBuffer = duration
+			}
+		}
+		if ipBanRetryInterval, ok := configMap["ip_ban_retry_interval"].(string); ok {
+			if duration, err := time.ParseDuration(ipBanRetryInterval); err == nil {
+				config.IPBanRetryInterval = duration
+			}
+		}
+		if ipBanRetryMax, ok := configMap["ip_ban_retry_max"].(int); ok {
+			config.IPBanRetryMax = ipBanRetryMax
+		}
+	}
+
+	switch p := prov.(type) {
+	case provider.RealtimeStockProvider:
+		return NewSimplifiedFrequencyControlProvider(p, config), nil
+	default:
+		return nil, fmt.Errorf("不支持为类型 %T 应用简化频率控制装饰器", p)
+	}
+}
+
+// createSimplifiedCircuitBreakerProvider 创建简化熔断器装饰器
+func createSimplifiedCircuitBreakerProvider(prov provider.Provider, configMap map[string]interface{}) (provider.Provider, error) {
+	config := DefaultSimplifiedCircuitBreakerConfig()
+
+	// 解析配置
+	if configMap != nil {
+		if name, ok := configMap["name"].(string); ok {
+			config.Name = name
+		}
+		if maxRequests, ok := configMap["max_requests"].(int); ok {
+			config.MaxRequests = uint32(maxRequests)
+		}
+		if interval, ok := configMap["interval"].(string); ok {
+			if duration, err := time.ParseDuration(interval); err == nil {
+				config.Interval = duration
+			}
+		}
+		if timeout, ok := configMap["timeout"].(string); ok {
+			if duration, err := time.ParseDuration(timeout); err == nil {
+				config.Timeout = duration
+			}
+		}
+		if readyToTrip, ok := configMap["ready_to_trip"].(int); ok {
+			config.ReadyToTrip = uint32(readyToTrip)
+		}
+		if enabled, ok := configMap["enabled"].(bool); ok {
+			config.Enabled = enabled
+		}
+		if marketTimeAware, ok := configMap["market_time_aware"].(bool); ok {
+			config.MarketTimeAware = marketTimeAware
+		}
+	}
+
+	switch p := prov.(type) {
+	case provider.RealtimeStockProvider:
+		return NewSimplifiedCircuitBreakerProvider(p, config), nil
+	default:
+		return nil, fmt.Errorf("不支持为类型 %T 应用简化熔断器装饰器", p)
 	}
 }

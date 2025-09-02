@@ -149,7 +149,7 @@ func main() {
 
 	// 创建简单股票数据提供商
 	simpleProvider := NewSimpleRealtimeStockProvider()
-	
+
 	// 创建频率控制配置
 	config := &decorators.FrequencyControlConfig{
 		MinInterval: 500 * time.Millisecond, // 最小间隔500ms
@@ -170,21 +170,21 @@ func main() {
 	ctx := context.Background()
 
 	fmt.Println("=== 测试频率控制效果 ===")
-	
+
 	// 连续发起多次请求，观察频率控制效果
 	for i := 1; i <= 5; i++ {
 		start := time.Now()
-		
+
 		fmt.Printf("第%d次请求开始...\n", i)
 		data, err := decoratedProvider.FetchStockData(ctx, symbols)
 		elapsed := time.Since(start)
-		
+
 		if err != nil {
 			fmt.Printf("请求失败: %v\n", err)
 		} else {
 			fmt.Printf("成功获取%d条数据，耗时: %v\n", len(data), elapsed)
 			for _, stock := range data {
-				fmt.Printf("  %s: ¥%.2f (变化: %.2f, %.2f%%)\n", 
+				fmt.Printf("  %s: ¥%.2f (变化: %.2f, %.2f%%)\n",
 					stock.Symbol, stock.Price, stock.Change, stock.ChangePercent)
 			}
 		}
@@ -195,14 +195,14 @@ func main() {
 	fmt.Println("=== 动态调整配置 ===")
 	fmt.Println("调整最小间隔为1秒...")
 	decoratedProvider.SetMinInterval(1 * time.Second)
-	
+
 	fmt.Println("禁用频率控制...")
 	decoratedProvider.SetEnabled(false)
-	
+
 	start := time.Now()
 	stockData, err := decoratedProvider.FetchStockData(ctx, symbols)
 	elapsed := time.Since(start)
-	
+
 	if err != nil {
 		fmt.Printf("请求失败: %v\n", err)
 	} else {
@@ -217,13 +217,13 @@ func main() {
 	}
 
 	fmt.Println("\n=== 测试历史数据提供商的频率控制 ===")
-	
+
 	// 创建简单历史数据提供商
 	simpleHistoricalProvider := NewSimpleHistoricalProvider()
-	
+
 	// 使用频率控制装饰历史数据提供商
 	historicalDecorated := decorators.NewFrequencyControlForHistoricalProvider(
-		simpleHistoricalProvider, 
+		simpleHistoricalProvider,
 		&decorators.FrequencyControlConfig{
 			MinInterval: 1 * time.Second, // 历史数据使用更长的间隔
 			MaxRetries:  3,
@@ -238,12 +238,12 @@ func main() {
 	start = time.Now()
 	endTime := time.Now()
 	startTime := endTime.Add(-30 * 24 * time.Hour) // 获取30天的历史数据
-	
+
 	// 需要类型转换才能调用 FetchHistoricalData
 	if histProvider, ok := historicalDecorated.(provider.HistoricalProvider); ok {
 		historicalData, err := histProvider.FetchHistoricalData(ctx, "000001.SZ", startTime, endTime, "daily")
 		elapsed = time.Since(start)
-		
+
 		if err != nil {
 			fmt.Printf("获取历史数据失败: %v\n", err)
 		} else {
@@ -251,31 +251,31 @@ func main() {
 			if len(historicalData) > 0 {
 				fmt.Printf("最新数据: %s - 开盘:%.2f 最高:%.2f 最低:%.2f 收盘:%.2f\n",
 					historicalData[0].Timestamp.Format("2006-01-02"),
-					historicalData[0].Open, historicalData[0].High, 
+					historicalData[0].Open, historicalData[0].High,
 					historicalData[0].Low, historicalData[0].Close)
 			}
 		}
 	} else {
 		fmt.Println("类型转换失败：无法调用历史数据方法")
 	}
-	
+
 	fmt.Println("\n=== 使用通用Mock Provider ===")
-	
+
 	// 创建通用Mock Provider
 	mockProvider := providers.NewMockProvider(providers.DefaultMockProviderConfig())
-	
+
 	// 设置mock数据
 	mockProvider.SetMockData([]string{"600000.SH", "000001.SZ"}, []core.StockData{
 		{Symbol: "600000.SH", Name: "浦发银行", Price: 8.90, Change: 0.15, ChangePercent: 1.71, Volume: 2000000, Timestamp: time.Now()},
 		{Symbol: "000001.SZ", Name: "平安银行", Price: 12.34, Change: 0.56, ChangePercent: 4.75, Volume: 1500000, Timestamp: time.Now()},
 	})
-	
+
 	// 包装Mock Provider（需要实现RealtimeStockProvider接口的适配器）
 	mockAdapter := &MockProviderAdapter{mockProvider}
 	mockDecoratedProvider := decorators.NewFrequencyControlProvider(mockAdapter, config)
-	
+
 	fmt.Printf("Mock装饰器名称: %s\n", mockDecoratedProvider.Name())
-	
+
 	testSymbols := []string{"600000.SH", "000001.SZ"}
 	mockData, err := mockDecoratedProvider.FetchStockData(ctx, testSymbols)
 	if err != nil {
@@ -283,10 +283,10 @@ func main() {
 	} else {
 		fmt.Printf("Mock Provider成功获取%d条数据\n", len(mockData))
 		for _, stock := range mockData {
-			fmt.Printf("  %s (%s): ¥%.2f (变化: %.2f, %.2f%%)\n", 
+			fmt.Printf("  %s (%s): ¥%.2f (变化: %.2f, %.2f%%)\n",
 				stock.Symbol, stock.Name, stock.Price, stock.Change, stock.ChangePercent)
 		}
 	}
-	
+
 	fmt.Println("\n频率控制装饰器示例完成！")
 }

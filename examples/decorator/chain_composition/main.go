@@ -101,7 +101,7 @@ func main() {
 
 	// 方式1: 手动组合装饰器链
 	fmt.Println("\n=== 手动组合装饰器链 ===")
-	
+
 	// 频率控制配置
 	fcConfig := &decorators.FrequencyControlConfig{
 		MinInterval: 300 * time.Millisecond,
@@ -133,10 +133,10 @@ func main() {
 	fmt.Println("\n--- 测试正常请求 ---")
 	for i := 1; i <= 3; i++ {
 		start := time.Now()
-		
+
 		data, err := fullyDecorated.FetchStockData(ctx, symbols)
 		elapsed := time.Since(start)
-		
+
 		if err != nil {
 			fmt.Printf("第%d次请求失败: %v, 耗时: %v\n", i, err, elapsed)
 		} else {
@@ -147,10 +147,10 @@ func main() {
 	// 测试失败情况
 	fmt.Println("\n--- 测试装饰器链的错误处理 ---")
 	baseProvider.SetFailureMode(true)
-	
+
 	for i := 1; i <= 5; i++ {
 		data, err := fullyDecorated.FetchStockData(ctx, symbols)
-		
+
 		if err != nil {
 			fmt.Printf("失败测试第%d次: %v\n", i, err)
 		} else {
@@ -159,7 +159,7 @@ func main() {
 
 		// 显示熔断器状态
 		fmt.Printf("  熔断器状态: %s\n", fullyDecorated.GetState())
-		
+
 		time.Sleep(200 * time.Millisecond)
 	}
 
@@ -208,23 +208,23 @@ func main() {
 	}
 
 	fmt.Printf("配置驱动装饰器链: %s\n", configDecorated.Name())
-	
+
 	// 测试配置驱动的装饰器链
 	fmt.Println("\n--- 测试配置驱动装饰器链 ---")
-	
+
 	if realtimeProvider, ok := configDecorated.(provider.RealtimeStockProvider); ok {
 		for i := 1; i <= 4; i++ {
 			start := time.Now()
-			
+
 			data, err := realtimeProvider.FetchStockData(ctx, symbols)
 			elapsed := time.Since(start)
-			
+
 			if err != nil {
 				fmt.Printf("配置链第%d次请求失败: %v, 耗时: %v\n", i, err, elapsed)
 			} else {
 				fmt.Printf("配置链第%d次请求成功: 获取%d条数据, 耗时: %v\n", i, len(data), elapsed)
 			}
-			
+
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
@@ -233,11 +233,11 @@ func main() {
 
 	// 测试不同的装饰器组合顺序
 	baseProvider3 := NewTestableStockProvider("OrderTestProvider")
-	
+
 	// 顺序1: 频率控制 -> 熔断器
 	fc1 := decorators.NewFrequencyControlProvider(baseProvider3, fcConfig)
 	order1 := decorators.NewCircuitBreakerProvider(fc1, cbConfig)
-	
+
 	// 顺序2: 熔断器 -> 频率控制 (需要重新创建配置，避免名称冲突)
 	cbConfig2 := &decorators.CircuitBreakerConfig{
 		Name:        "OuterCircuitBreaker",
@@ -247,7 +247,7 @@ func main() {
 		ReadyToTrip: 2,
 		Enabled:     true,
 	}
-	
+
 	baseProvider4 := NewTestableStockProvider("OrderTestProvider2")
 	cb2 := decorators.NewCircuitBreakerProvider(baseProvider4, cbConfig2)
 	order2 := decorators.NewFrequencyControlProvider(cb2, fcConfig)
@@ -257,7 +257,7 @@ func main() {
 
 	// 比较两种顺序的性能
 	fmt.Println("\n--- 性能比较测试 ---")
-	
+
 	testOrders := []struct {
 		name     string
 		provider provider.RealtimeStockProvider
@@ -268,17 +268,17 @@ func main() {
 
 	for _, test := range testOrders {
 		fmt.Printf("\n测试 %s:\n", test.name)
-		
+
 		totalTime := time.Duration(0)
 		successCount := 0
-		
+
 		for i := 1; i <= 3; i++ {
 			start := time.Now()
-			
+
 			data, err := test.provider.FetchStockData(ctx, symbols)
 			elapsed := time.Since(start)
 			totalTime += elapsed
-			
+
 			if err != nil {
 				fmt.Printf("  第%d次: 失败 - %v, 耗时: %v\n", i, err, elapsed)
 			} else {
@@ -286,7 +286,7 @@ func main() {
 				successCount++
 			}
 		}
-		
+
 		avgTime := totalTime / 3
 		fmt.Printf("  平均耗时: %v, 成功率: %d/3\n", avgTime, successCount)
 	}
@@ -355,13 +355,13 @@ func main() {
 	// 测试复杂场景
 	if realtimeProvider, ok := complexDecorated.(provider.RealtimeStockProvider); ok {
 		fmt.Println("\n--- 复杂场景正常测试 ---")
-		
+
 		for i := 1; i <= 3; i++ {
 			start := time.Now()
-			
+
 			data, err := realtimeProvider.FetchStockData(ctx, symbols)
 			elapsed := time.Since(start)
-			
+
 			if err != nil {
 				fmt.Printf("复杂链第%d次请求失败: %v, 耗时: %v\n", i, err, elapsed)
 			} else {
